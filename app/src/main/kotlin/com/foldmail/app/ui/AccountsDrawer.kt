@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -54,6 +55,8 @@ fun AccountsDrawer(
     ui: MailUiState,
     onSelectAccount: (Long?) -> Unit,
     onView: (ListView) -> Unit,
+    onAddAccount: () -> Unit,
+    onSync: () -> Unit,
 ) {
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
@@ -116,9 +119,8 @@ fun AccountsDrawer(
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
-            DrawerItem(Icons.Filled.Add, "Pridať účet", soon = true) {
-                Toast.makeText(context, "Pridanie účtu príde s Gmail/IMAP modulom", Toast.LENGTH_SHORT).show()
-            }
+            DrawerItem(Icons.Filled.Add, "Pridať Google účet", onClick = onAddAccount)
+            DrawerItem(Icons.Filled.Sync, "Synchronizovať", onClick = onSync)
         }
     }
 }

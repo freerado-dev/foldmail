@@ -15,6 +15,15 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    // Fixed debug key so the SHA-1 registered in Google Cloud stays the same for every CI build.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "foldmail"
+            keyAlias = "foldmail"
+            keyPassword = "foldmail"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -45,6 +54,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coroutines.core)
+    implementation(libs.play.services.auth)
 
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }

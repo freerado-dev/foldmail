@@ -23,16 +23,24 @@ data class Account(val id: Long, val name: String, val email: String, val colorA
 /** A message together with its body text (the domain model carries headers only). */
 data class MailItem(val email: EmailMessage, val body: String, val attachments: List<Attachment> = emptyList())
 
+/** Progress/error of background synchronisation, shown as a thin bar and a message in the list. */
+data class SyncStatus(val syncing: Boolean = false, val error: String? = null)
+
 /**
- * The seam where the real data layer (Room + Gmail/IMAP sync) plugs in later.
- * The UI only talks to this interface.
+ * The seam where the data layer plugs in. The UI only talks to this interface.
+ * Implementations: [InMemoryMailRepository] (demo) and the Gmail-backed one in `data/`.
  */
 interface MailRepository {
     val items: StateFlow<List<MailItem>>
+    val accounts: StateFlow<List<Account>>
+    val status: StateFlow<SyncStatus>
     val accountAddress: String
-    val accounts: List<Account>
     fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList(), accountId: Long = 1)
     fun markRead(localIds: Collection<Long>)
+    /** Re-downloads mail for all real accounts (no-op for the demo). */
+    fun refresh()
+    /** Stores a Google account authorised with [accessToken] and starts syncing it. */
+    suspend fun addGoogleAccount(accessToken: String)
 }
 
 /** In-memory implementation backed by [DemoData]; nothing is persisted or sent over the network. */
@@ -42,7 +50,8 @@ class InMemoryMailRepository(
 ) : MailRepository {
 
     override val accountAddress: String = DemoData.ME
-    override val accounts: List<Account> = DemoData.accounts
+    override val accounts: StateFlow<List<Account>> = MutableStateFlow(DemoData.accounts)
+    override val status: StateFlow<SyncStatus> = MutableStateFlow(SyncStatus())
     private val state = MutableStateFlow(seed)
     override val items: StateFlow<List<MailItem>> = state
 
@@ -65,6 +74,12 @@ class InMemoryMailRepository(
             )
             list + MailItem(mail, body, attachments)
         }
+    }
+
+    override fun refresh() = Unit
+
+    override suspend fun addGoogleAccount(accessToken: String) {
+        throw UnsupportedOperationException("Demo repozitár nepodporuje pridanie účtu")
     }
 
     override fun markRead(localIds: Collection<Long>) {

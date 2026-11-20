@@ -38,11 +38,20 @@ detekcia pozície zloženia (androidx.window / tabletop) – layout sa zatiaľ r
 2. Overenie jadra: `./gradlew :core-domain:test` a `./gradlew :app:testDebugUnitTest`
 3. Build: `./gradlew assembleDebug` → `app/build/outputs/apk/debug/`
 
-## Google OAuth (pre budúci Gmail modul)
+## Google účet (Gmail) – nastavenie
 
-1. Google Cloud Console → nový projekt → zapnúť Gmail API.
-2. OAuth consent screen → pridať scopes (Gmail) a testovacích používateľov.
-3. Credentials → OAuth client ID typu **Android** (package name + SHA-1 z podpisového kľúča).
-4. Client ID vložiť do `local.properties` (`GOOGLE_CLIENT_ID=...`), súbor nie je vo verzii gitu.
-   Gmail scopes sú „restricted", takže verejné vydanie vyžaduje overenie aplikácie Googlom;
-   pre osobné použitie stačí režim Testing.
+Aplikácia sa prihlasuje cez Google Play services (Authorization API), preto netreba client secret,
+len OAuth klienta typu **Android**:
+
+1. console.cloud.google.com → nový projekt → *APIs & Services → Library* → zapnúť **Gmail API**.
+2. *OAuth consent screen* (Google Auth platform) → typ **External**, stav **Testing**, pridať svoj Gmail
+   medzi **Test users**. (Scope `gmail.modify` je „restricted“; v režime Testing stačí.)
+3. *Credentials → Create credentials → OAuth client ID* → typ **Android**:
+   - Package name: `com.foldmail.app`
+   - SHA-1: `9E:59:CD:56:DC:42:B4:92:A9:59:12:AD:BF:6C:7F:EC:F8:32:EC:5B`
+     (fixný debug kľúč `app/debug.keystore`, takže SHA-1 je pri každom builde rovnaký)
+4. V aplikácii: potiahnuť doprava → **Pridať Google účet**.
+
+Debug kľúč je verejný v repozitári, použite ho len na testovanie. Vlastný kľúč na vydanie vygenerujte zvlášť.
+Aplikácia stiahne posledných 40 správ z Doručených a 40 z Odoslaných, odosiela a označuje prečítané cez Gmail API.
+Archív/Kôš/Pripnúť… zatiaľ ostávajú len lokálne (nemenia Gmail).

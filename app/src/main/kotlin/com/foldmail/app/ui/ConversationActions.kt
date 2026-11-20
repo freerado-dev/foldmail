@@ -12,7 +12,11 @@ import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -101,62 +105,73 @@ class RowActions(
 // --------------------------------------------------------------------------------------------
 
 /**
- * Row that slides left to reveal [actions] behind it. Right-swipes are NOT consumed while the row
- * is closed, so the navigation drawer (swipe right anywhere) still works.
+ * Row that slides left to reveal [actions] behind it. A right-swipe on a closed row calls
+ * [onSwipeRight] (used to open the accounts drawer), because this row consumes horizontal drags.
  */
 @Composable
 fun SwipeRevealRow(
     revealed: Boolean,
     onRevealedChange: (Boolean) -> Unit,
     actionsWidth: Dp,
+    onSwipeRight: () -> Unit,
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val widthPx = with(LocalDensity.current) { actionsWidth.toPx() }
-    val offset = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(revealed) { offset.animateTo(if (revealed) -widthPx else 0f) }
+    val density = LocalDensity.current
+    val widthPx = with(density) { actionsWidth.toPx() }
+    val rightThresholdPx = with(density) { 60.dp.toPx() }
+    var x by remember { mutableFloatStateOf(0f) }
+    var dragging by remember { mutableStateOf(false) }
+    var total by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(revealed, widthPx) {
+        if (!dragging) animate(x, if (revealed) -widthPx else 0f) { v, _ -> x = v }
+    }
+    val dragState = rememberDraggableState { dx ->
+        total += dx
+        x = (x + dx).coerceIn(-widthPx, 0f)
+    }
 
     Box(modifier.clipToBounds()) {
         Row(Modifier.matchParentSize(), horizontalArrangement = Arrangement.End) { actions() }
         Box(
             Modifier
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .pointerInputSwipe(widthPx, offset, scope, onRevealedChange),
+                .offset { IntOffset(x.roundToInt(), 0) }
+                .draggable(
+                    state = dragState,
+                    orientation = Orientation.Horizontal,
+                    onDragStarted = { dragging = true; total = 0f },
+                    onDragStopped = { velocity ->
+                        dragging = false
+                        if (!revealed && x == 0f && total > rightThresholdPx) {
+                            onSwipeRight()
+                        } else {
+                            val open = x < -widthPx / 2f || (velocity < -1500f && x < 0f)
+                            onRevealedChange(open)
+                            animate(x, if (open) -widthPx else 0f) { v, _ -> x = v }
+                        }
+                    },
+                ),
         ) { content() }
     }
 }
 
-private fun Modifier.pointerInputSwipe(
-    widthPx: Float,
-    offset: Animatable<Float, *>,
-    scope: kotlinx.coroutines.CoroutineScope,
-    onRevealedChange: (Boolean) -> Unit,
-): Modifier = this.then(
-    Modifier.pointerInput(widthPx) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-                // Claim the gesture only for left-swipes, or to close an open row.
-                if (over < 0f || offset.value < 0f) {
-                    change.consume()
-                    scope.launch { offset.snapTo((offset.value + over).coerceIn(-widthPx, 0f)) }
-                }
-            }
-            if (drag != null) {
-                horizontalDrag(drag.id) { change ->
-                    change.consume()
-                    val dx = change.positionChange().x
-                    scope.launch { offset.snapTo((offset.value + dx).coerceIn(-widthPx, 0f)) }
-                }
-                val open = offset.value < -widthPx / 2f
-                onRevealedChange(open)
-                scope.launch { offset.animateTo(if (open) -widthPx else 0f) }
-            }
+/** Opens the drawer on a right swipe anywhere a child did not already consume the drag. */
+fun Modifier.openOnRightSwipe(thresholdDp: Float = 70f, onOpen: () -> Unit): Modifier = this.pointerInput(Unit) {
+    val threshold = thresholdDp * density
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var total = 0f
+        val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+            if (over > 0f) { change.consume(); total += over }
         }
-    },
-)
+        if (drag != null) {
+            horizontalDrag(drag.id) { change -> total += change.positionChange().x; change.consume() }
+            if (total > threshold) onOpen()
+        }
+    }
+}
 
 @Composable
 fun SwipeAction(label: String, icon: ImageVector, color: Color, onClick: () -> Unit) {

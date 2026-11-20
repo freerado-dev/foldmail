@@ -30,8 +30,11 @@ fun nameDirectory(emails: List<EmailMessage>): Map<String, String> {
 fun nameOf(address: String, names: Map<String, String>): String =
     names[address] ?: address.substringBefore('@')
 
-fun PersonConversation.isSelfNote(selfAddress: String): Boolean =
-    participants == setOf(normalizeAddress(selfAddress))
+/** A chat with yourself, judged by the account the messages belong to (works with several accounts). */
+fun PersonConversation.isSelfNote(selfAddress: String = ""): Boolean {
+    val own = messages.firstOrNull()?.accountAddress?.takeIf { it.isNotBlank() } ?: selfAddress
+    return participants == setOf(normalizeAddress(own))
+}
 
 fun PersonConversation.title(names: Map<String, String>, selfAddress: String): String =
     if (isSelfNote(selfAddress)) "Poznámky pre seba" else participants.joinToString(", ") { nameOf(it, names) }

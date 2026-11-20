@@ -1,6 +1,13 @@
 package com.foldmail.app.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.foldmail.app.data.GoogleAuth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -93,6 +100,32 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         togglePriority = vm::togglePriority, toggleAutoArchive = vm::toggleAutoArchive,
         block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo,
     )
+    val context = LocalContext.current
+    val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        try {
+            vm.addGoogleAccount(GoogleAuth.tokenFromIntent(context, result.data))
+        } catch (e: Exception) {
+            vm.reportMessage("Prihlásenie zlyhalo: ${e.message ?: e.javaClass.simpleName}")
+        }
+    }
+    fun addAccount() {
+        scope.launch {
+            try {
+                val r = GoogleAuth.authorize(context, null)
+                val pending = r.pendingIntent
+                if (r.hasResolution() && pending != null) {
+                    authLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
+                } else {
+                    vm.addGoogleAccount(r.accessToken ?: error("Google nevrátil prístupový token"))
+                }
+            } catch (e: Exception) {
+                vm.reportMessage("Prihlásenie zlyhalo: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+    LaunchedEffect(ui.message) {
+        ui.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); vm.consumeMessage() }
+    }
     fun showList() { tab = MainTab.Chats; openKey = null; composing = false; scope.launch { drawerState.close() } }
 
     fun startCompose(to: String = "") { composeTo = to; composing = true; tab = MainTab.Chats }
@@ -103,15 +136,22 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // Closed: our own detector opens it (so rows can use horizontal drags); open: the drawer handles closing swipes.
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             AccountsDrawer(
                 ui,
                 onSelectAccount = { vm.selectAccount(it); showList() },
                 onView = { vm.setView(it); showList() },
+                onAddAccount = { scope.launch { drawerState.close() }; addAccount() },
+                onSync = { vm.refresh(); scope.launch { drawerState.close() } },
             )
         },
     ) {
-    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .openOnRightSwipe { scope.launch { drawerState.open() } },
+    ) {
         val expanded = maxWidth >= ExpandedBreakpoint
 
         val listPane: @Composable (Modifier) -> Unit = { mod ->
@@ -140,7 +180,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     onOpened = { vm.markRead(open) },
                     onReply = { text, files ->
                         val subject = open.last.subject.let { if (it.startsWith("Re:", true)) it else "Re: $it" }
-                        vm.send(open.participants.toList(), subject, text, open.last.messageId, files)
+                        vm.send(open.participants.toList(), subject, text, open.last.messageId, files, open.last.accountId)
                     },
                     modifier = mod,
                 )

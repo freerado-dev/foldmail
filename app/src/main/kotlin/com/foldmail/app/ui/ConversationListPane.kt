@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -134,6 +135,13 @@ fun ConversationListPane(
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        if (ui.syncing) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp))
+        ui.syncError?.let {
+            Text(
+                it, Modifier.fillMaxWidth().background(Color(0xFFFFF0F0)).padding(horizontal = 12.dp, vertical = 4.dp),
+                color = Color(0xFFB00020), fontSize = 11.sp, lineHeight = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+            )
+        }
 
         LazyColumn(Modifier.fillMaxSize()) {
             if (pinned.isNotEmpty()) {
@@ -141,13 +149,13 @@ fun ConversationListPane(
                     SectionHeader("Pripnuté (${pinned.size})", expandable = true, open = pinnedOpen) { pinnedOpen = !pinnedOpen }
                 }
                 if (pinnedOpen) items(pinned, key = { "p-" + it.key }) { c ->
-                    ConversationRow(c, ui, c.key == selectedKey, revealedKey == c.key, { revealedKey = if (it) c.key else null }, onOpen, actions) { moreFor = c }
+                    ConversationRow(c, ui, c.key == selectedKey, revealedKey == c.key, { revealedKey = if (it) c.key else null }, onOpen, actions, onOpenDrawer) { moreFor = c }
                 }
             }
             sections.forEach { (name, list) ->
                 item(key = "hdr-$name") { SectionHeader(name) }
                 items(list, key = { it.key }) { c ->
-                    ConversationRow(c, ui, c.key == selectedKey, revealedKey == c.key, { revealedKey = if (it) c.key else null }, onOpen, actions) { moreFor = c }
+                    ConversationRow(c, ui, c.key == selectedKey, revealedKey == c.key, { revealedKey = if (it) c.key else null }, onOpen, actions, onOpenDrawer) { moreFor = c }
                 }
             }
         }
@@ -179,6 +187,7 @@ private fun ConversationRow(
     onRevealedChange: (Boolean) -> Unit,
     onOpen: (String) -> Unit,
     actions: RowActions,
+    onSwipeRight: () -> Unit,
     onMore: () -> Unit,
 ) {
     val title = c.title(ui.names, ui.selfAddress)
@@ -194,6 +203,7 @@ private fun ConversationRow(
         revealed = revealed,
         onRevealedChange = onRevealedChange,
         actionsWidth = 216.dp,
+        onSwipeRight = onSwipeRight,
         actions = {
             SwipeActionButtons(
                 onMore = onMore,

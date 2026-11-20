@@ -1,6 +1,10 @@
 package com.foldmail.app
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.foldmail.app.data.AppMailRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import com.foldmail.domain.model.EmailMessage
 import com.foldmail.domain.threading.PersonConversation
@@ -43,6 +47,9 @@ data class MailUiState(
     val unreadByAccount: Map<Long, Int> = emptyMap(),
     val view: ListView = ListView.All,
     val flags: Flags = Flags(),
+    val syncing: Boolean = false,
+    val syncError: String? = null,
+    val message: String? = null,
 ) {
     val accountCount: Int get() = accounts.size
     val pinned: Set<String> get() = flags.pinned
@@ -51,16 +58,31 @@ data class MailUiState(
     fun accountColor(id: Long): Long = accounts.firstOrNull { it.id == id }?.colorArgb ?: 0xFF8E8E93
 }
 
-class MailViewModel(
-    private val repo: MailRepository = InMemoryMailRepository(),
-    private val clock: () -> Long = System::currentTimeMillis,
-) : ViewModel() {
+private data class ViewState(val account: Long? = null, val view: ListView = ListView.All)
+
+class MailViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo: MailRepository = AppMailRepository(app)
+    private val clock: () -> Long = System::currentTimeMillis
 
     private val flags = MutableStateFlow(Flags())
-    private val selectedAccount = MutableStateFlow<Long?>(null)
-    private val listView = MutableStateFlow(ListView.All)
+    private val viewState = MutableStateFlow(ViewState())
+    private val message = MutableStateFlow<String?>(null)
 
-    val state: StateFlow<MailUiState> = combine(repo.items, flags, selectedAccount, listView) { items, f, acc, view ->
+    init {
+        // Pull new mail once a minute while the app is alive (no-op without a real account).
+        viewModelScope.launch {
+            while (true) {
+                delay(60_000)
+                repo.refresh()
+            }
+        }
+    }
+
+    private val statusAndMessage = combine(repo.status, message) { s, m -> s to m }
+
+    val state: StateFlow<MailUiState> = combine(repo.items, flags, viewState, repo.accounts, statusAndMessage) { items, f, vs, accounts, sm ->
+        val acc = vs.account
+        val view = vs.view
         val emails: List<EmailMessage> = items.map { it.email }
         val scoped = if (acc == null) emails else emails.filter { it.accountId == acc }
         // Keys stay person-based in every account view so flags survive switching accounts.
@@ -77,22 +99,47 @@ class MailViewModel(
             attachments = items.associate { it.email.localId to it.attachments },
             names = nameDirectory(emails),
             selfAddress = repo.accountAddress,
-            accounts = repo.accounts,
+            accounts = accounts,
             selectedAccount = acc,
             unreadByAccount = emails.filter { !it.isRead && !it.isOutgoing }.groupingBy { it.accountId }.eachCount(),
             view = view,
             flags = f,
+            syncing = sm.first.syncing,
+            syncError = sm.first.error,
+            message = sm.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
 
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList()) =
-        repo.send(to, subject, body, inReplyTo, attachments, selectedAccount.value ?: 1L)
+    /** [accountId] null = the account currently selected in the drawer, else the first one. */
+    fun send(
+        to: List<String>, subject: String, body: String, inReplyTo: String? = null,
+        attachments: List<Attachment> = emptyList(), accountId: Long? = null,
+    ) = repo.send(
+        to, subject, body, inReplyTo, attachments,
+        accountId ?: viewState.value.account ?: repo.accounts.value.firstOrNull()?.id ?: 1L,
+    )
+
+    fun refresh() = repo.refresh()
+
+    fun addGoogleAccount(accessToken: String) {
+        viewModelScope.launch {
+            try {
+                repo.addGoogleAccount(accessToken)
+                message.value = "Účet pridaný, sťahujem poštu…"
+            } catch (e: Exception) {
+                message.value = "Pridanie účtu zlyhalo: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    fun reportMessage(text: String) { message.value = text }
+    fun consumeMessage() { message.value = null }
 
     fun markRead(conversation: PersonConversation) =
         repo.markRead(conversation.messages.filter { !it.isRead }.map { it.localId })
 
-    fun selectAccount(id: Long?) { selectedAccount.value = id; listView.value = ListView.All }
-    fun setView(v: ListView) { listView.value = v }
+    fun selectAccount(id: Long?) { viewState.value = ViewState(id, ListView.All) }
+    fun setView(v: ListView) { viewState.update { it.copy(view = v) } }
 
     fun togglePin(key: String) = flags.update { it.copy(pinned = it.pinned.toggle(key)) }
     fun toggleStar(key: String) = flags.update { it.copy(starred = it.starred.toggle(key)) }
