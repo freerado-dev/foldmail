@@ -55,6 +55,10 @@ object GmailApi {
         request("POST", "$BASE/messages/send", token, body.toString())
     }
 
+    fun trash(token: String, id: String) {
+        request("POST", "$BASE/messages/$id/trash", token, "")
+    }
+
     fun markRead(token: String, id: String) {
         request("POST", "$BASE/messages/$id/modify", token, JSONObject().put("removeLabelIds", JSONArray().put("UNREAD")).toString())
     }
@@ -97,7 +101,7 @@ object GmailParser {
             cc = splitAddresses(headers["cc"].orEmpty()).map(::decodeHeader),
             isRead = "UNREAD" !in labels,
         )
-        return ParsedMessage(MailItem(email, body, attachments), id, json.optString("threadId"))
+        return ParsedMessage(MailItem(email, body, attachments, html.toString().ifBlank { null }), id, json.optString("threadId"))
     }
 
     private fun walk(part: JSONObject, plain: StringBuilder, html: StringBuilder, attachments: MutableList<Attachment>) {

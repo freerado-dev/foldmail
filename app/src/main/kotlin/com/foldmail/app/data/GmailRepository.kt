@@ -37,6 +37,8 @@ class GmailRepository(private val context: Context) {
 
     /** local message id -> (account id, gmail id, thread id) */
     private val gmailIds = ConcurrentHashMap<Long, Triple<Long, String, String>>()
+    /** "accountId:gmailId" -> parsed message, so refreshes only download new mail. */
+    private val cache = ConcurrentHashMap<String, MailItem>()
     /** Message-ID header -> gmail thread id, so replies stay in the same Gmail thread. */
     private val threadByMessageId = ConcurrentHashMap<String, String>()
 
@@ -102,20 +104,26 @@ class GmailRepository(private val context: Context) {
 
     private suspend fun syncAccount(account: Account): List<MailItem> {
         val token = GoogleAuth.accessToken(context, account.email)
-        val ids = (GmailApi.listIds(token, "INBOX", MAX_PER_LABEL) + GmailApi.listIds(token, "SENT", MAX_PER_LABEL)).distinct()
-        val gate = Semaphore(6)
-        return coroutineScope {
-            ids.map { id ->
+        val ids = (GmailApi.listIds(token, "INBOX", INBOX_COUNT) + GmailApi.listIds(token, "SENT", SENT_COUNT)).distinct()
+        // Download only what is new (plus the newest few, to pick up read/unread changes).
+        val toFetch = (ids.filter { "${account.id}:$it" !in cache } + ids.take(REFRESH_NEWEST)).distinct()
+        val gate = Semaphore(10)
+        coroutineScope {
+            toFetch.map { id ->
                 async {
                     gate.withPermit {
                         val parsed = GmailParser.parse(GmailApi.getMessage(token, id), account.id, account.email)
                         gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
                         parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
-                        parsed.item
+                        cache["${account.id}:$id"] = parsed.item
                     }
                 }
             }.awaitAll()
         }
+        // Forget messages that disappeared on the server (deleted elsewhere).
+        val keep = ids.map { "${account.id}:$it" }.toSet()
+        cache.keys.filter { it.startsWith("${account.id}:") && it !in keep }.forEach { cache.remove(it) }
+        return ids.mapNotNull { cache["${account.id}:$it"] }
     }
 
     fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
@@ -155,6 +163,30 @@ class GmailRepository(private val context: Context) {
         }
     }
 
+    /** Trash = delete for real: removes from the list now and from Gmail in the background. */
+    fun moveMessages(localIds: Collection<Long>, folder: com.foldmail.app.Folder) {
+        if (folder != com.foldmail.app.Folder.Trash || localIds.isEmpty()) return
+        val ids = localIds.toSet()
+        items.update { list -> list.filter { it.email.localId !in ids } }
+        cache.entries.removeAll { it.value.email.localId in ids }
+        scope.launch {
+            var failed: String? = null
+            for (id in ids) {
+                val (accountId, gmailId, _) = gmailIds[id] ?: continue
+                val account = accounts.value.firstOrNull { it.id == accountId } ?: continue
+                try {
+                    GmailApi.trash(GoogleAuth.accessToken(context, account.email), gmailId)
+                } catch (e: Exception) {
+                    failed = e.message ?: e.javaClass.simpleName
+                }
+            }
+            if (failed != null) {
+                status.value = SyncStatus(false, "Mazanie v Gmaile zlyhalo: $failed")
+                sync()
+            }
+        }
+    }
+
     fun markRead(localIds: Collection<Long>) {
         if (localIds.isEmpty()) return
         items.update { list -> list.map { if (it.email.localId in localIds) it.copy(email = it.email.copy(isRead = true)) else it } }
@@ -172,7 +204,9 @@ class GmailRepository(private val context: Context) {
     }
 
     companion object {
-        private const val MAX_PER_LABEL = 40
+        private const val INBOX_COUNT = 200
+        private const val SENT_COUNT = 100
+        private const val REFRESH_NEWEST = 25
         private val PALETTE = listOf(0xFFFF3B30, 0xFF0A28F0, 0xFF34C759, 0xFFFFCC00, 0xFFAF52DE, 0xFFFF2D55, 0xFF5AC8FA)
     }
 }

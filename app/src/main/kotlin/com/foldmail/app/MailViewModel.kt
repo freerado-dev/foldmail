@@ -19,9 +19,6 @@ import kotlinx.coroutines.flow.update
 /** Which set of chats the list shows. */
 enum class ListView { All, Notes, Starred, Archived }
 
-/** Target of "Move to" / Trash / Archive. */
-enum class Folder { Inbox, Archive, Trash }
-
 /** Per-conversation user state, keyed by conversation key. */
 data class Flags(
     val pinned: Set<String> = setOf("anna@example.com"), // demo: one pinned chat so the section is visible
@@ -30,8 +27,8 @@ data class Flags(
     val priority: Set<String> = emptySet(),
     val autoArchive: Set<String> = emptySet(),
     val blocked: Set<String> = emptySet(),
-    val archived: Set<String> = emptySet(),
-    val trashed: Set<String> = emptySet(),
+    /** conversation key -> time it was archived; new mail after that brings the chat back. */
+    val archived: Map<String, Long> = emptyMap(),
     val snoozed: Map<String, Long> = emptyMap(),
 )
 
@@ -40,6 +37,7 @@ data class MailUiState(
     val conversations: List<PersonConversation> = emptyList(),
     val bodies: Map<Long, String> = emptyMap(),
     val attachments: Map<Long, List<Attachment>> = emptyMap(),
+    val htmls: Map<Long, String> = emptyMap(),
     val names: Map<String, String> = emptyMap(),
     val selfAddress: String = "",
     val accounts: List<Account> = emptyList(),
@@ -90,13 +88,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val now = clock()
         val visible = all.filter { c ->
             val k = c.key
-            if (view == ListView.Archived) k in f.archived && k !in f.trashed
-            else k !in f.archived && k !in f.trashed && k !in f.blocked && (f.snoozed[k] ?: 0L) <= now
+            val archivedAt = f.archived[k]
+            val isArchived = archivedAt != null && c.last.sentAtMillis <= archivedAt
+            if (view == ListView.Archived) isArchived
+            else !isArchived && k !in f.blocked && (f.snoozed[k] ?: 0L) <= now
         }
         MailUiState(
             conversations = visible,
             bodies = items.associate { it.email.localId to it.body },
             attachments = items.associate { it.email.localId to it.attachments },
+            htmls = items.mapNotNull { m -> m.html?.let { m.email.localId to it } }.toMap(),
             names = nameDirectory(emails),
             selfAddress = repo.accountAddress,
             accounts = accounts,
@@ -149,11 +150,21 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun block(key: String) = flags.update { it.copy(blocked = it.blocked + key) }
     fun snooze(key: String, untilMillis: Long) = flags.update { it.copy(snoozed = it.snoozed + (key to untilMillis)) }
 
-    fun moveTo(key: String, folder: Folder) = flags.update {
-        val archived = if (folder == Folder.Archive) it.archived + key else it.archived - key
-        val trashed = if (folder == Folder.Trash) it.trashed + key else it.trashed - key
-        it.copy(archived = archived, trashed = trashed, snoozed = it.snoozed - key)
+    fun moveTo(key: String, folder: Folder) {
+        if (folder == Folder.Trash) {
+            // Really delete: removes the messages here and in Gmail.
+            val ids = state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
+            repo.moveMessages(ids, Folder.Trash)
+        } else {
+            flags.update {
+                val archived = if (folder == Folder.Archive) it.archived + (key to clock()) else it.archived - key
+                it.copy(archived = archived, snoozed = it.snoozed - key)
+            }
+        }
     }
+
+    /** Deletes one message (here and in Gmail). */
+    fun deleteMessage(localId: Long) = repo.moveMessages(listOf(localId), Folder.Trash)
 
     private fun Set<String>.toggle(k: String) = if (k in this) this - k else this + k
 }

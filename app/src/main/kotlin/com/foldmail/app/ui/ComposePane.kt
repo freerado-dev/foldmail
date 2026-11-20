@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
@@ -33,20 +32,22 @@ import com.foldmail.app.Attachment
 @Composable
 fun ComposePane(
     initialTo: String,
+    initialSubject: String = "",
+    initialBody: String = "",
     onClose: () -> Unit,
     onSend: (to: List<String>, subject: String, body: String, attachments: List<Attachment>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var to by rememberSaveable(initialTo) { mutableStateOf(initialTo) }
-    var subject by rememberSaveable { mutableStateOf("") }
-    var body by rememberSaveable { mutableStateOf("") }
+    var subject by rememberSaveable { mutableStateOf(initialSubject) }
+    var body by rememberSaveable { mutableStateOf(initialBody) }
     val pending = remember { mutableStateListOf<Attachment>() }
     val actions = rememberAttachmentActions { pending.addAll(it) }
 
     val recipients = to.split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }
     val canSend = recipients.isNotEmpty() && recipients.all { '@' in it } && (body.isNotBlank() || pending.isNotEmpty())
 
-    Column(modifier.background(MaterialTheme.colorScheme.background).statusBarsPadding().imePadding().navigationBarsPadding()) {
+    Column(modifier.background(MaterialTheme.colorScheme.background).safeTop().imePadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Zavrieť") }
             Text("Nový email", Modifier.padding(start = 4.dp).weight(1f), style = MaterialTheme.typography.titleMedium)

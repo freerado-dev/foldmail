@@ -21,7 +21,16 @@ data class Attachment(
 data class Account(val id: Long, val name: String, val email: String, val colorArgb: Long)
 
 /** A message together with its body text (the domain model carries headers only). */
-data class MailItem(val email: EmailMessage, val body: String, val attachments: List<Attachment> = emptyList())
+data class MailItem(
+    val email: EmailMessage,
+    val body: String,
+    val attachments: List<Attachment> = emptyList(),
+    /** Original HTML of the mail (null for plain-text mails), shown in the full message viewer. */
+    val html: String? = null,
+)
+
+/** Target of "Move to" / Trash / Archive. */
+enum class Folder { Inbox, Archive, Trash }
 
 /** Progress/error of background synchronisation, shown as a thin bar and a message in the list. */
 data class SyncStatus(val syncing: Boolean = false, val error: String? = null)
@@ -37,6 +46,8 @@ interface MailRepository {
     val accountAddress: String
     fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList(), accountId: Long = 1)
     fun markRead(localIds: Collection<Long>)
+    /** Trash removes the messages for real (on the Gmail server too); other folders are local only. */
+    fun moveMessages(localIds: Collection<Long>, folder: Folder)
     /** Re-downloads mail for all real accounts (no-op for the demo). */
     fun refresh()
     /** Stores a Google account authorised with [accessToken] and starts syncing it. */
@@ -77,6 +88,11 @@ class InMemoryMailRepository(
     }
 
     override fun refresh() = Unit
+
+    override fun moveMessages(localIds: Collection<Long>, folder: Folder) {
+        if (folder != Folder.Trash || localIds.isEmpty()) return
+        state.update { list -> list.filter { it.email.localId !in localIds } }
+    }
 
     override suspend fun addGoogleAccount(accessToken: String) {
         throw UnsupportedOperationException("Demo repozitár nepodporuje pridanie účtu")

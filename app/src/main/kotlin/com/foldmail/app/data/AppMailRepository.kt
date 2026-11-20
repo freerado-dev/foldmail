@@ -44,6 +44,10 @@ class AppMailRepository(context: Context) : MailRepository {
         if (real) gmail.markRead(localIds) else demo.markRead(localIds)
     }
 
+    override fun moveMessages(localIds: Collection<Long>, folder: com.foldmail.app.Folder) {
+        if (real) gmail.moveMessages(localIds, folder) else demo.moveMessages(localIds, folder)
+    }
+
     override fun refresh() = gmail.refresh()
 
     override suspend fun addGoogleAccount(accessToken: String) = gmail.addAccount(accessToken)

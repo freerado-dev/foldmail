@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,8 +65,10 @@ fun ChatPane(
     onBack: (() -> Unit)?,
     onOpened: () -> Unit,
     onReply: (String, List<Attachment>) -> Unit,
+    onAction: (MessageAction, EmailMessage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var selectedId by rememberSaveable(conversation.key) { mutableStateOf<Long?>(null) }
     val title = conversation.title(ui.names, ui.selfAddress)
     val messages = conversation.messages
     // Header-based thread index per message -> the subject heading is shown where a thread starts.
@@ -80,7 +82,7 @@ fun ChatPane(
         if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
     }
 
-    Column(modifier.background(MaterialTheme.colorScheme.background).statusBarsPadding().imePadding()) {
+    Column(modifier.background(MaterialTheme.colorScheme.background).safeTop().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Späť") }
@@ -124,11 +126,18 @@ fun ChatPane(
                         attachments = ui.attachments[m.localId].orEmpty(),
                         senderName = nameOf(normalizeAddress(m.from), ui.names),
                         selfInitial = ui.selfAddress.take(1).uppercase().ifEmpty { "J" },
+                        selected = selectedId == m.localId,
+                        onClick = { selectedId = if (selectedId == m.localId) null else m.localId },
                     )
                 }
             }
         }
 
+        MessageActionBar(onAction = { a ->
+            val target = messages.firstOrNull { it.localId == selectedId } ?: messages.lastOrNull()
+            if (target != null) onAction(a, target)
+            if (a == MessageAction.Delete) selectedId = null
+        })
         ReplyBar(title, onSend = onReply)
     }
 }
@@ -141,6 +150,8 @@ private fun MessageRow(
     attachments: List<Attachment>,
     senderName: String,
     selfInitial: String,
+    selected: Boolean,
+    onClick: () -> Unit,
 ) {
     val outgoing = m.isOutgoing
     Row(
@@ -152,7 +163,7 @@ private fun MessageRow(
             Avatar(senderName, size = 24.dp)
             Spacer(Modifier.width(6.dp))
         }
-        Bubble(subject, body, attachments, Modifier.weight(1f, fill = false))
+        Bubble(subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
             Avatar(selfInitial, size = 24.dp)
@@ -161,15 +172,15 @@ private fun MessageRow(
 }
 
 @Composable
-private fun Bubble(subject: String?, body: String, attachments: List<Attachment>, modifier: Modifier = Modifier) {
+private fun Bubble(subject: String?, body: String, attachments: List<Attachment>, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val split = remember(body) { QuoteSplitter.split(body) }
     var showQuote by rememberSaveable(body) { mutableStateOf(false) }
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(16.dp),
-        modifier = modifier.widthIn(max = 520.dp),
+        modifier = modifier.widthIn(max = 520.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
             if (!subject.isNullOrBlank()) {

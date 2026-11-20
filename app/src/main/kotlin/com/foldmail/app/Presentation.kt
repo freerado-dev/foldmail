@@ -92,6 +92,45 @@ fun formatSize(bytes: Long?): String = when {
     else -> "$bytes B"
 }
 
+/** "Re: " / "Fwd: " prefix that is not added twice. */
+fun prefixSubject(subject: String, prefix: String): String {
+    val s = subject.trim()
+    return if (s.lowercase().startsWith(prefix.trim().lowercase())) s else prefix + s
+}
+
+/** Recipients for a reply (sender) or reply-all (sender + everybody else), never including yourself. */
+fun replyRecipients(m: EmailMessage, replyAll: Boolean): List<String> {
+    val own = normalizeAddress(m.accountAddress)
+    fun norm(l: List<String>) = l.map(::normalizeAddress).filter { it.isNotEmpty() }
+    val base = if (m.isOutgoing) norm(m.to) else listOf(normalizeAddress(m.from))
+    val extra = if (replyAll) norm(m.to) + norm(m.cc) else emptyList()
+    val all = (base + extra).distinct()
+    val others = all.filter { it != own }
+    return if (others.isEmpty()) all else others
+}
+
+fun quoteForReply(m: EmailMessage, body: String, names: Map<String, String>): String {
+    val who = nameOf(normalizeAddress(m.from), names)
+    val quoted = body.trim().lines().joinToString("\n") { "> $it" }
+    return "\n\nDňa ${formatChatStamp(m.sentAtMillis)}, $who napísal(a):\n$quoted"
+}
+
+fun forwardBody(m: EmailMessage, body: String): String =
+    "\n\n---------- Preposlaná správa ----------\nOd: ${m.from}\nDátum: ${formatChatStamp(m.sentAtMillis)}\n" +
+        "Predmet: ${m.subject}\nKomu: ${m.to.joinToString(", ")}\n\n${body.trim()}"
+
+/** Full HTML document for the message viewer (readable on a phone, images fit the width). */
+fun wrapHtml(html: String?, plain: String): String {
+    val inner = html?.takeIf { it.isNotBlank() } ?: run {
+        val esc = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        "<pre style=\"white-space:pre-wrap;font-family:sans-serif;margin:0\">$esc</pre>"
+    }
+    return "<!doctype html><html><head><meta charset=\"utf-8\">" +
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+        "<style>body{margin:12px;word-wrap:break-word;font-family:sans-serif;font-size:15px;color:#1d1d1f;background:#fff}" +
+        "img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>$inner</body></html>"
+}
+
 /** One entry of the "later" part of the More menu. */
 data class SnoozeOption(val label: String, val detail: String, val atMillis: Long)
 

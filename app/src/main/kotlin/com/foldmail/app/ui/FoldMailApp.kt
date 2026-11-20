@@ -44,6 +44,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import com.foldmail.app.forwardBody
+import com.foldmail.app.prefixSubject
+import com.foldmail.app.quoteForReply
+import com.foldmail.app.replyRecipients
+import com.foldmail.domain.model.EmailMessage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,8 +96,15 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var openKey by rememberSaveable { mutableStateOf<String?>(null) }
     var composing by rememberSaveable { mutableStateOf(false) }
     var composeTo by rememberSaveable { mutableStateOf("") }
+    var composeSubject by rememberSaveable { mutableStateOf("") }
+    var composeBody by rememberSaveable { mutableStateOf("") }
+    var composeReplyTo by rememberSaveable { mutableStateOf<String?>(null) }
+    var composeAccount by rememberSaveable { mutableStateOf(-1L) }
+    var draftVersion by rememberSaveable { mutableStateOf(0) }
+    var viewingId by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val open = ui.conversations.firstOrNull { it.key == openKey }
+    val viewing = open?.messages?.firstOrNull { it.localId == viewingId }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -126,10 +139,33 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     LaunchedEffect(ui.message) {
         ui.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); vm.consumeMessage() }
     }
-    fun showList() { tab = MainTab.Chats; openKey = null; composing = false; scope.launch { drawerState.close() } }
+    fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; scope.launch { drawerState.close() } }
 
-    fun startCompose(to: String = "") { composeTo = to; composing = true; tab = MainTab.Chats }
-    fun openChat(key: String) { openKey = key; composing = false; tab = MainTab.Chats }
+    fun startCompose(to: String = "") {
+        composeTo = to; composeSubject = ""; composeBody = ""; composeReplyTo = null; composeAccount = -1L
+        draftVersion++; composing = true; tab = MainTab.Chats
+    }
+    fun openChat(key: String) { openKey = key; composing = false; viewingId = null; tab = MainTab.Chats }
+    fun onMessageAction(a: MessageAction, m: EmailMessage) {
+        val body = ui.bodies[m.localId].orEmpty()
+        when (a) {
+            MessageAction.Reply, MessageAction.ReplyAll -> {
+                composeTo = replyRecipients(m, a == MessageAction.ReplyAll).joinToString(", ")
+                composeSubject = prefixSubject(m.subject, "Re: ")
+                composeBody = quoteForReply(m, body, ui.names)
+                composeReplyTo = m.messageId; composeAccount = m.accountId
+                draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
+            }
+            MessageAction.Forward -> {
+                composeTo = ""; composeSubject = prefixSubject(m.subject, "Fwd: ")
+                composeBody = forwardBody(m, body)
+                composeReplyTo = null; composeAccount = m.accountId
+                draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
+            }
+            MessageAction.Delete -> { vm.deleteMessage(m.localId); viewingId = null }
+            MessageAction.ShowFull -> viewingId = m.localId
+        }
+    }
 
     var listWidthDp by rememberSaveable { mutableFloatStateOf(360f) }
     val density = LocalDensity.current.density
@@ -167,10 +203,23 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->
             when {
-                composing -> ComposePane(
-                    initialTo = composeTo,
-                    onClose = { composing = false },
-                    onSend = { to, subject, body, files -> vm.send(to, subject, body, attachments = files); composing = false },
+                composing -> key(draftVersion) {
+                    ComposePane(
+                        initialTo = composeTo,
+                        initialSubject = composeSubject,
+                        initialBody = composeBody,
+                        onClose = { composing = false },
+                        onSend = { to, subject, body, files ->
+                            vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 })
+                            composing = false
+                        },
+                        modifier = mod,
+                    )
+                }
+                viewing != null -> MessageViewPane(
+                    message = viewing, ui = ui,
+                    onBack = { viewingId = null },
+                    onAction = { a -> onMessageAction(a, viewing) },
                     modifier = mod,
                 )
                 open != null -> ChatPane(
@@ -178,6 +227,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     ui = ui,
                     onBack = if (expanded) null else ({ openKey = null }),
                     onOpened = { vm.markRead(open) },
+                    onAction = ::onMessageAction,
                     onReply = { text, files ->
                         val subject = open.last.subject.let { if (it.startsWith("Re:", true)) it else "Re: $it" }
                         vm.send(open.participants.toList(), subject, text, open.last.messageId, files, open.last.accountId)
@@ -228,7 +278,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             }
         } else {
             val fullScreen = composing || (tab.isChatList && open != null)
-            BackHandler(enabled = fullScreen) { if (composing) composing = false else openKey = null }
+            BackHandler(enabled = fullScreen) {
+                if (composing) composing = false else if (viewingId != null) viewingId = null else openKey = null
+            }
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 bottomBar = {
