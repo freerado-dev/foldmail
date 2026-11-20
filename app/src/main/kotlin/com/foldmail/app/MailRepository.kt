@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
 /** A message together with its body text (the domain model carries headers only). */
-data class MailItem(val email: EmailMessage, val body: String)
+data class MailItem(val email: EmailMessage, val body: String, val attachments: List<String> = emptyList())
 
 /**
  * The seam where the real data layer (Room + Gmail/IMAP sync) plugs in later.

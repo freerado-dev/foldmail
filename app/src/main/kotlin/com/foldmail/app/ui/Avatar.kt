@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,12 +24,16 @@ private val AvatarColors = listOf(
 )
 
 @Composable
-fun Avatar(title: String, size: Dp = 48.dp, modifier: Modifier = Modifier) {
+fun Avatar(title: String, size: Dp = 48.dp, modifier: Modifier = Modifier, isGroup: Boolean = false) {
     val color = AvatarColors[(title.hashCode() and Int.MAX_VALUE) % AvatarColors.size]
     Box(
         modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
     ) {
-        Text(initialOf(title), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = (size.value * 0.42f).sp)
+        if (isGroup) {
+            Icon(Icons.Filled.Groups, null, tint = Color.White, modifier = Modifier.size(size * 0.55f))
+        } else {
+            Text(initialOf(title), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = (size.value * 0.42f).sp)
+        }
     }
 }

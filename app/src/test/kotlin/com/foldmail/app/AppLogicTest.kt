@@ -14,7 +14,7 @@ class AppLogicTest {
 
     @Test fun demoDataGroupsIntoOneChatPerPersonOrGroup() {
         val c = convs(repo())
-        assertEquals(5, c.size) // Anna, Peter, Lucia, group Alfa+Peter, notes-to-self
+        assertEquals(6, c.size) // Marek, Anna, Peter, Lucia, group Alfa+Peter, notes-to-self
         assertEquals(1, c.count { it.participants == setOf("anna@example.com") })
     }
 
@@ -46,7 +46,10 @@ class AppLogicTest {
 
     @Test fun timestampFormatting() {
         val z = ZoneId.of("UTC")
-        assertEquals("včera", formatTimestamp(now - 24 * 3_600_000L, now, z))
+        assertEquals("Dnes", sectionOf(now - 60_000L, now, z))
+        assertEquals("Včera", sectionOf(now - 24 * 3_600_000L, now, z))
+        assertEquals("Tento týždeň", sectionOf(now - 3 * 24 * 3_600_000L, now, z))
+        assertEquals("Staršie", sectionOf(now - 20 * 24 * 3_600_000L, now, z))
         assertEquals("previewskipsquote", previewOf("> quoted\npreviewskipsquote"))
     }
 }

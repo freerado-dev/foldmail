@@ -4,14 +4,16 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -37,9 +39,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.foldmail.app.MailViewModel
 
 enum class MainTab(val label: String, val icon: ImageVector) {
-    Chats("Chaty", Icons.Filled.Email),
+    Chats("Chaty", Icons.Filled.ChatBubble),
+    Calendar("Kalendár", Icons.Filled.CalendarMonth),
+    Groups("Skupiny", Icons.Filled.Groups),
     Contacts("Kontakty", Icons.Filled.Person),
-    Calendar("Kalendár", Icons.Filled.DateRange),
+    ;
+
+    val isChatList: Boolean get() = this == Chats || this == Groups
 }
 
 /** Width from which we switch to the two-pane layout (Z Fold 7 unfolded is well above this). */
@@ -69,7 +75,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         val expanded = maxWidth >= ExpandedBreakpoint
 
         val listPane: @Composable (Modifier) -> Unit = { mod ->
-            ConversationListPane(ui, selectedKey = if (expanded) openKey else null, onOpen = ::openChat, modifier = mod)
+            ConversationListPane(
+                ui, selectedKey = if (expanded) openKey else null, onOpen = ::openChat,
+                onTogglePin = vm::togglePin, onToggleStar = vm::toggleStar,
+                modifier = mod,
+                heading = if (tab == MainTab.Groups) "Skupiny" else "Zjednotené",
+                groupsOnly = tab == MainTab.Groups,
+            )
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->
             when {
@@ -115,7 +127,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     }
                 }
                 when (tab) {
-                    MainTab.Chats -> {
+                    MainTab.Chats, MainTab.Groups -> {
                         listPane(Modifier.width(360.dp).fillMaxHeight())
                         VerticalDivider()
                         detailPane(Modifier.weight(1f).fillMaxHeight())
@@ -129,7 +141,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 }
             }
         } else {
-            val fullScreen = composing || (tab == MainTab.Chats && open != null)
+            val fullScreen = composing || (tab.isChatList && open != null)
             BackHandler(enabled = fullScreen) { if (composing) composing = false else openKey = null }
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
@@ -140,7 +152,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 val mod = Modifier.fillMaxSize().padding(padding)
                 when {
                     fullScreen -> detailPane(mod)
-                    tab == MainTab.Chats -> listPane(mod)
+                    tab.isChatList -> listPane(mod)
                     tab == MainTab.Contacts -> contacts(mod)
                     else -> calendar(mod)
                 }
@@ -149,33 +161,35 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     }
 }
 
-/** Chats · Contacts · [New email, accent] · Calendar. */
+/** Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */
 @Composable
 private fun CompactBottomBar(tab: MainTab, onTab: (MainTab) -> Unit, onCompose: () -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.background) {
+        BarItem(MainTab.Chats, tab, onTab)
+        BarItem(MainTab.Calendar, tab, onTab)
+        // Always "selected" so the accent circle is always drawn; it is an action, not a destination.
         NavigationBarItem(
-            selected = tab == MainTab.Chats, onClick = { onTab(MainTab.Chats) },
-            icon = { Icon(MainTab.Chats.icon, null) }, label = { Text(MainTab.Chats.label) },
-        )
-        NavigationBarItem(
-            selected = tab == MainTab.Contacts, onClick = { onTab(MainTab.Contacts) },
-            icon = { Icon(MainTab.Contacts.icon, null) }, label = { Text(MainTab.Contacts.label) },
-        )
-        NavigationBarItem(
-            // Always "selected" so the accent pill is always drawn; it is an action, not a destination.
             selected = true, onClick = onCompose,
             icon = { Icon(Icons.Filled.Edit, contentDescription = "Nový email") },
-            label = { Text("Nový") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                selectedTextColor = MaterialTheme.colorScheme.primary,
                 indicatorColor = MaterialTheme.colorScheme.primary,
             ),
-            alwaysShowLabel = true,
         )
-        NavigationBarItem(
-            selected = tab == MainTab.Calendar, onClick = { onTab(MainTab.Calendar) },
-            icon = { Icon(MainTab.Calendar.icon, null) }, label = { Text(MainTab.Calendar.label) },
-        )
+        BarItem(MainTab.Groups, tab, onTab)
+        BarItem(MainTab.Contacts, tab, onTab)
     }
+}
+
+@Composable
+private fun RowScope.BarItem(t: MainTab, current: MainTab, onTab: (MainTab) -> Unit) {
+    NavigationBarItem(
+        selected = current == t, onClick = { onTab(t) },
+        icon = { Icon(t.icon, contentDescription = t.label) },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = MaterialTheme.colorScheme.onSurface,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    )
 }
