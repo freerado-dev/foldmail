@@ -1,6 +1,7 @@
 package com.foldmail.app.data
 
 import com.foldmail.app.Attachment
+import com.foldmail.app.InlinePart
 import com.foldmail.app.MailItem
 import com.foldmail.domain.model.EmailMessage
 import org.json.JSONArray
