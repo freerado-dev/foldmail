@@ -77,3 +77,10 @@ fun sectionOf(
         else -> "Staršie"
     }
 }
+
+fun formatSize(bytes: Long?): String = when {
+    bytes == null -> ""
+    bytes >= 1_000_000 -> String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0)
+    bytes >= 1_000 -> "${bytes / 1_000} kB"
+    else -> "$bytes B"
+}

@@ -28,6 +28,16 @@ class AppLogicTest {
         assertEquals(now, after.last.sentAtMillis)
     }
 
+    @Test fun sentAttachmentsAreKept() {
+        val r = repo()
+        val file = Attachment("foto.jpg", "content://x/1", "image/jpeg", 2_500_000)
+        r.send(listOf("anna@example.com"), "Foto", "", attachments = listOf(file))
+        val sent = r.items.value.last()
+        assertEquals(listOf(file), sent.attachments)
+        assertTrue(file.isImage)
+        assertEquals("2.5 MB", formatSize(file.sizeBytes))
+    }
+
     @Test fun markReadClearsUnread() {
         val r = repo()
         val anna = convs(r).first { "anna@example.com" in it.participants }

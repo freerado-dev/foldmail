@@ -2,6 +2,14 @@ package com.foldmail.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -25,14 +33,15 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,6 +56,10 @@ enum class MainTab(val label: String, val icon: ImageVector) {
 
     val isChatList: Boolean get() = this == Chats || this == Groups
 }
+
+private const val RailWidthDp = 80f
+private const val MinListDp = 240f
+private const val MinDetailDp = 320f
 
 /** Width from which we switch to the two-pane layout (Z Fold 7 unfolded is well above this). */
 private val ExpandedBreakpoint = 600.dp
@@ -71,6 +84,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     fun startCompose(to: String = "") { composeTo = to; composing = true; tab = MainTab.Chats }
     fun openChat(key: String) { openKey = key; composing = false; tab = MainTab.Chats }
 
+    var listWidthDp by rememberSaveable { mutableFloatStateOf(360f) }
+    val density = LocalDensity.current.density
+
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val expanded = maxWidth >= ExpandedBreakpoint
 
@@ -88,7 +104,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 composing -> ComposePane(
                     initialTo = composeTo,
                     onClose = { composing = false },
-                    onSend = { to, subject, body -> vm.send(to, subject, body); composing = false },
+                    onSend = { to, subject, body, files -> vm.send(to, subject, body, attachments = files); composing = false },
                     modifier = mod,
                 )
                 open != null -> ChatPane(
@@ -96,9 +112,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     ui = ui,
                     onBack = if (expanded) null else ({ openKey = null }),
                     onOpened = { vm.markRead(open) },
-                    onReply = { text ->
+                    onReply = { text, files ->
                         val subject = open.last.subject.let { if (it.startsWith("Re:", true)) it else "Re: $it" }
-                        vm.send(open.participants.toList(), subject, text, open.last.messageId)
+                        vm.send(open.participants.toList(), subject, text, open.last.messageId, files)
                     },
                     modifier = mod,
                 )
@@ -111,6 +127,10 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         val calendar: @Composable (Modifier) -> Unit = { mod -> CalendarScreen(mod) }
 
         if (expanded) {
+            // Left pane is user-resizable by dragging the divider; the right pane takes the rest.
+            val maxList = (maxWidth.value - RailWidthDp - MinDetailDp).coerceAtLeast(MinListDp)
+            val leftWidth = listWidthDp.coerceIn(MinListDp, maxList)
+            val dragger: (Float) -> Unit = { px -> listWidthDp = (leftWidth + px / density).coerceIn(MinListDp, maxList) }
             Row(Modifier.fillMaxSize()) {
                 NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
                     FloatingActionButton(
@@ -128,13 +148,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 }
                 when (tab) {
                     MainTab.Chats, MainTab.Groups -> {
-                        listPane(Modifier.width(360.dp).fillMaxHeight())
-                        VerticalDivider()
+                        listPane(Modifier.width(leftWidth.dp).fillMaxHeight())
+                        PaneDivider(onDrag = dragger)
                         detailPane(Modifier.weight(1f).fillMaxHeight())
                     }
                     MainTab.Contacts -> {
-                        contacts(Modifier.width(360.dp).fillMaxHeight())
-                        VerticalDivider()
+                        contacts(Modifier.width(leftWidth.dp).fillMaxHeight())
+                        PaneDivider(onDrag = dragger)
                         detailPane(Modifier.weight(1f).fillMaxHeight())
                     }
                     MainTab.Calendar -> calendar(Modifier.weight(1f).fillMaxHeight())
@@ -192,4 +212,22 @@ private fun RowScope.BarItem(t: MainTab, current: MainTab, onTab: (MainTab) -> U
             indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     )
+}
+
+/** Draggable divider between list and detail pane, with a grab handle at the bottom (as in Samsung Email). */
+@Composable
+private fun PaneDivider(onDrag: (Float) -> Unit) {
+    Box(
+        Modifier
+            .width(20.dp)
+            .fillMaxHeight()
+            .draggable(state = rememberDraggableState(onDrag), orientation = Orientation.Horizontal),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
+        Box(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).size(width = 5.dp, height = 56.dp)
+                .clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+        )
+    }
 }

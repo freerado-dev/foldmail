@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.foldmail.app.Attachment
 import com.foldmail.app.MailUiState
 import com.foldmail.app.formatChatStamp
 import com.foldmail.app.nameOf
@@ -62,7 +64,7 @@ fun ChatPane(
     ui: MailUiState,
     onBack: (() -> Unit)?,
     onOpened: () -> Unit,
-    onReply: (String) -> Unit,
+    onReply: (String, List<Attachment>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = conversation.title(ui.names, ui.selfAddress)
@@ -136,7 +138,7 @@ private fun MessageRow(
     m: EmailMessage,
     subject: String?,
     body: String,
-    attachments: List<String>,
+    attachments: List<Attachment>,
     senderName: String,
     selfInitial: String,
 ) {
@@ -159,7 +161,7 @@ private fun MessageRow(
 }
 
 @Composable
-private fun Bubble(subject: String?, body: String, attachments: List<String>, modifier: Modifier = Modifier) {
+private fun Bubble(subject: String?, body: String, attachments: List<Attachment>, modifier: Modifier = Modifier) {
     val split = remember(body) { QuoteSplitter.split(body) }
     var showQuote by rememberSaveable(body) { mutableStateOf(false) }
 
@@ -174,19 +176,9 @@ private fun Bubble(subject: String?, body: String, attachments: List<String>, mo
                 Text(subject, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.size(6.dp))
             }
-            Text(split.fresh.trim().ifEmpty { body.trim() })
-            attachments.forEach { name ->
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
-                ) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Description, null, Modifier.size(28.dp))
-                        Text(name, Modifier.padding(start = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+            val text = split.fresh.trim().ifEmpty { body.trim() }
+            if (text.isNotEmpty()) Text(text)
+            attachments.forEach { AttachmentView(it, Modifier.padding(top = 8.dp)) }
             if (split.quoted.isNotBlank()) {
                 Text(
                     if (showQuote) "Skryť pôvodný email" else "… pôvodný email",
@@ -201,22 +193,28 @@ private fun Bubble(subject: String?, body: String, attachments: List<String>, mo
 }
 
 @Composable
-private fun ReplyBar(title: String, onSend: (String) -> Unit) {
+private fun ReplyBar(title: String, onSend: (String, List<Attachment>) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
+    val pending = remember { mutableStateListOf<Attachment>() }
+    val actions = rememberAttachmentActions { pending.addAll(it) }
+    val canSend = text.isNotBlank() || pending.isNotEmpty()
+
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.AutoMirrored.Filled.Reply, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        PendingAttachments(pending, onRemove = { pending.remove(it) })
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            AttachMenuButton(actions)
             OutlinedTextField(
                 value = text, onValueChange = { text = it },
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 placeholder = { Text("Odpovedať: $title", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 shape = MaterialTheme.shapes.large,
                 maxLines = 5,
             )
             FilledIconButton(
-                enabled = text.isNotBlank(),
-                onClick = { onSend(text.trim()); text = "" },
+                enabled = canSend,
+                onClick = { onSend(text.trim(), pending.toList()); text = ""; pending.clear() },
+                modifier = Modifier.padding(end = 8.dp),
             ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Odoslať") }
         }
     }

@@ -5,8 +5,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
+/** A file attached to a message. [uri] is null for demo attachments that have no real content. */
+data class Attachment(
+    val name: String,
+    val uri: String? = null,
+    val mimeType: String = "application/octet-stream",
+    val sizeBytes: Long? = null,
+) {
+    val isImage: Boolean get() = mimeType.startsWith("image/")
+    val isVideo: Boolean get() = mimeType.startsWith("video/")
+    val isPdf: Boolean get() = mimeType == "application/pdf"
+}
+
 /** A message together with its body text (the domain model carries headers only). */
-data class MailItem(val email: EmailMessage, val body: String, val attachments: List<String> = emptyList())
+data class MailItem(val email: EmailMessage, val body: String, val attachments: List<Attachment> = emptyList())
 
 /**
  * The seam where the real data layer (Room + Gmail/IMAP sync) plugs in later.
@@ -15,7 +27,7 @@ data class MailItem(val email: EmailMessage, val body: String, val attachments: 
 interface MailRepository {
     val items: StateFlow<List<MailItem>>
     val accountAddress: String
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null)
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList())
     fun markRead(localIds: Collection<Long>)
 }
 
@@ -29,7 +41,7 @@ class InMemoryMailRepository(
     private val state = MutableStateFlow(seed)
     override val items: StateFlow<List<MailItem>> = state
 
-    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?) {
+    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>) {
         state.update { list ->
             val id = (list.maxOfOrNull { it.email.localId } ?: 0L) + 1
             val parent = inReplyTo?.let { ref -> list.firstOrNull { it.email.messageId == ref }?.email }
@@ -46,7 +58,7 @@ class InMemoryMailRepository(
                 to = to,
                 isRead = true,
             )
-            list + MailItem(mail, body)
+            list + MailItem(mail, body, attachments)
         }
     }
 

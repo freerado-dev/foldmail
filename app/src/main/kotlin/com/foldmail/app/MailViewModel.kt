@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.update
 data class MailUiState(
     val conversations: List<PersonConversation> = emptyList(),
     val bodies: Map<Long, String> = emptyMap(),
-    val attachments: Map<Long, List<String>> = emptyMap(),
+    val attachments: Map<Long, List<Attachment>> = emptyMap(),
     val names: Map<String, String> = emptyMap(),
     val selfAddress: String = "",
     val accountCount: Int = 0,
@@ -45,8 +45,8 @@ class MailViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
 
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null) =
-        repo.send(to, subject, body, inReplyTo)
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList()) =
+        repo.send(to, subject, body, inReplyTo, attachments)
 
     fun markRead(conversation: PersonConversation) =
         repo.markRead(conversation.messages.filter { !it.isRead }.map { it.localId })
