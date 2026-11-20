@@ -18,7 +18,22 @@ object GmailApi {
 
     class ApiException(val code: Int, message: String) : IOException(message)
 
+    /** Retries rate-limit (403/429) and server (5xx) errors with growing pauses. */
     private fun request(method: String, url: String, token: String, body: String? = null): String {
+        var attempt = 0
+        while (true) {
+            try {
+                return requestOnce(method, url, token, body)
+            } catch (e: ApiException) {
+                val limited = e.code == 429 || e.code >= 500 ||
+                    (e.code == 403 && Regex("rate|quota", RegexOption.IGNORE_CASE).containsMatchIn(e.message.orEmpty()))
+                if (!limited || ++attempt >= 6) throw e
+                Thread.sleep(1000L * attempt * attempt)
+            }
+        }
+    }
+
+    private fun requestOnce(method: String, url: String, token: String, body: String?): String {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
             c.requestMethod = method

@@ -110,15 +110,20 @@ class GmailRepository(private val context: Context) {
             ).distinct()
         // Download only what is new (plus the newest few, to pick up read/unread changes).
         val toFetch = (ids.filter { !cache.containsKey("${account.id}:$it") } + ids.take(REFRESH_NEWEST)).distinct()
-        val gate = Semaphore(10)
+        val gate = Semaphore(4)
+        var failure: Exception? = null
         coroutineScope {
             toFetch.map { id ->
                 async {
                     gate.withPermit {
-                        val parsed = GmailParser.parse(GmailApi.getMessage(token, id), account.id, account.email)
-                        gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
-                        parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
-                        cache["${account.id}:$id"] = parsed.item
+                        try {
+                            val parsed = GmailParser.parse(GmailApi.getMessage(token, id), account.id, account.email)
+                            gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
+                            parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
+                            cache["${account.id}:$id"] = parsed.item
+                        } catch (e: Exception) {
+                            failure = e   // keep what we have; the next sync continues where this one stopped
+                        }
                     }
                 }
             }.awaitAll()
@@ -126,7 +131,9 @@ class GmailRepository(private val context: Context) {
         // Forget messages that disappeared on the server (deleted elsewhere).
         val keep = ids.map { "${account.id}:$it" }.toSet()
         cache.keys.filter { it.startsWith("${account.id}:") && it !in keep }.forEach { cache.remove(it) }
-        return ids.mapNotNull { cache["${account.id}:$it"] }
+        val result = ids.mapNotNull { cache["${account.id}:$it"] }
+        if (failure != null && result.isEmpty()) throw failure!!
+        return result
     }
 
     fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
