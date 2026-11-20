@@ -49,11 +49,11 @@ fun ContactsScreen(
                             val direct = ui.conversations.firstOrNull { it.participants == setOf(address) }
                             if (direct != null) onOpenChat(direct.key) else onCompose(address)
                         }
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Avatar(name, size = 44.dp)
+                    Avatar(name, size = 30.dp)
                     Column {
                         Text(name, fontWeight = FontWeight.SemiBold)
                         Text(address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

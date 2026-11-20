@@ -94,9 +94,9 @@ fun ConversationListPane(
     val sections = visible.filter { it.key !in ui.pinned }.groupBy { sectionOf(it.last.sentAtMillis) }
 
     Column(modifier.statusBarsPadding()) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                Modifier.size(30.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.Email, null, tint = Color.White) }
             Column(Modifier.padding(start = 12.dp)) {
@@ -112,7 +112,7 @@ fun ConversationListPane(
             ListFilter.entries.forEach { f ->
                 val active = f == filter
                 Column(
-                    Modifier.weight(1f).clickable { filter = f }.padding(top = 8.dp),
+                    Modifier.weight(1f).clickable { filter = f }.padding(top = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(
@@ -120,7 +120,7 @@ fun ConversationListPane(
                         tint = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Box(
-                        Modifier.padding(top = 6.dp).height(3.dp).fillMaxWidth(0.5f)
+                        Modifier.padding(top = 3.dp).height(3.dp).fillMaxWidth(0.5f)
                             .background(if (active) MaterialTheme.colorScheme.onSurface else Color.Transparent),
                     )
                 }
@@ -150,7 +150,7 @@ fun ConversationListPane(
 @Composable
 private fun SectionHeader(text: String, expandable: Boolean = false, open: Boolean = true, onToggle: () -> Unit = {}) {
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = expandable, onClick = onToggle).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(enabled = expandable, onClick = onToggle).padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -180,14 +180,14 @@ private fun ConversationRow(
                 .fillMaxWidth()
                 .background(if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
                 .combinedClickable(onClick = { onOpen(c.key) }, onLongClick = { menu = true })
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 5.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Avatar(title, size = 56.dp, isGroup = c.isGroup)
+            Avatar(title, size = 38.dp, isGroup = c.isGroup)
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(width = 5.dp, height = 20.dp).clip(RoundedCornerShape(3.dp)).background(accountColor(last.accountId)))
+                    Box(Modifier.size(width = 4.dp, height = 14.dp).clip(RoundedCornerShape(3.dp)).background(accountColor(last.accountId)))
                     Text(
                         title, Modifier.weight(1f).padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,

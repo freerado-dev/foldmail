@@ -24,7 +24,7 @@ private val AvatarColors = listOf(
 )
 
 @Composable
-fun Avatar(title: String, size: Dp = 48.dp, modifier: Modifier = Modifier, isGroup: Boolean = false) {
+fun Avatar(title: String, size: Dp = 32.dp, modifier: Modifier = Modifier, isGroup: Boolean = false) {
     val color = AvatarColors[(title.hashCode() and Int.MAX_VALUE) % AvatarColors.size]
     Box(
         modifier.size(size).clip(CircleShape).background(color),

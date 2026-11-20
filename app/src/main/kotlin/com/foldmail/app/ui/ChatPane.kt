@@ -81,7 +81,7 @@ fun ChatPane(
     }
 
     Column(modifier.background(MaterialTheme.colorScheme.background).statusBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Späť") }
             } else {
@@ -101,8 +101,8 @@ fun ChatPane(
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
             state = listState,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             itemsIndexed(messages, key = { _, m -> m.localId }) { index, m ->
                 val prev = messages.getOrNull(index - 1)
@@ -110,7 +110,7 @@ fun ChatPane(
                     if (prev == null || m.sentAtMillis - prev.sentAtMillis > STAMP_GAP_MS) {
                         Text(
                             formatChatStamp(m.sentAtMillis),
-                            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -149,13 +149,13 @@ private fun MessageRow(
         verticalAlignment = Alignment.Top,
     ) {
         if (!outgoing) {
-            Avatar(senderName, size = 36.dp)
+            Avatar(senderName, size = 24.dp)
             Spacer(Modifier.width(6.dp))
         }
         Bubble(subject, body, attachments, Modifier.weight(1f, fill = false))
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
-            Avatar(selfInitial, size = 36.dp)
+            Avatar(selfInitial, size = 24.dp)
         }
     }
 }
@@ -168,13 +168,13 @@ private fun Bubble(subject: String?, body: String, attachments: List<Attachment>
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = modifier.widthIn(max = 520.dp),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
             if (!subject.isNullOrBlank()) {
                 Text(subject, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.size(6.dp))
+                Spacer(Modifier.size(2.dp))
             }
             val text = split.fresh.trim().ifEmpty { body.trim() }
             if (text.isNotEmpty()) Text(text)
