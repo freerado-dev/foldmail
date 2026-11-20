@@ -48,6 +48,15 @@ class AppMailRepository(context: Context) : MailRepository {
         if (real) gmail.moveMessages(localIds, folder) else demo.moveMessages(localIds, folder)
     }
 
+    override suspend fun fetchAttachment(localId: Long, attachment: Attachment) =
+        if (real) gmail.fetchAttachment(localId, attachment) else null
+
+    override suspend fun resolveHtml(localId: Long) = if (real) gmail.resolveHtml(localId) else null
+
+    override fun setStarred(localIds: Collection<Long>, starred: Boolean) {
+        if (real) gmail.setStarred(localIds, starred)
+    }
+
     override fun refresh() = gmail.refresh()
 
     override suspend fun addGoogleAccount(accessToken: String) = gmail.addAccount(accessToken)

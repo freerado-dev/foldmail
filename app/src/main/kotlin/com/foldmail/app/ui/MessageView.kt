@@ -141,8 +141,12 @@ fun MessageViewPane(
     ui: MailUiState,
     onBack: () -> Unit,
     onAction: (MessageAction) -> Unit,
+    resolveHtml: suspend (Long) -> String?,
     modifier: Modifier = Modifier,
 ) {
+    val html by androidx.compose.runtime.produceState<String?>(ui.htmls[message.localId], message.localId) {
+        value = try { resolveHtml(message.localId) } catch (_: Exception) { null } ?: ui.htmls[message.localId]
+    }
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Späť") }
@@ -159,7 +163,7 @@ fun MessageViewPane(
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        HtmlView(ui.htmls[message.localId], ui.bodies[message.localId].orEmpty(), Modifier.weight(1f).fillMaxWidth())
+        HtmlView(html, ui.bodies[message.localId].orEmpty(), Modifier.weight(1f).fillMaxWidth())
         MessageActionBar(onAction, Modifier.navigationBarsPadding(), showFullEntry = false)
     }
 }

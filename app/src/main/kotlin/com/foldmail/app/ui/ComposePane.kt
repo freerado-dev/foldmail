@@ -34,6 +34,7 @@ fun ComposePane(
     initialTo: String,
     initialSubject: String = "",
     initialBody: String = "",
+    initialAttachments: List<Attachment> = emptyList(),
     onClose: () -> Unit,
     onSend: (to: List<String>, subject: String, body: String, attachments: List<Attachment>) -> Unit,
     modifier: Modifier = Modifier,
@@ -41,7 +42,7 @@ fun ComposePane(
     var to by rememberSaveable(initialTo) { mutableStateOf(initialTo) }
     var subject by rememberSaveable { mutableStateOf(initialSubject) }
     var body by rememberSaveable { mutableStateOf(initialBody) }
-    val pending = remember { mutableStateListOf<Attachment>() }
+    val pending = remember { mutableStateListOf<Attachment>().apply { addAll(initialAttachments) } }
     val actions = rememberAttachmentActions { pending.addAll(it) }
 
     val recipients = to.split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }

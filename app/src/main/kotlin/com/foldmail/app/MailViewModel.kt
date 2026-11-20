@@ -143,7 +143,15 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun setView(v: ListView) { viewState.update { it.copy(view = v) } }
 
     fun togglePin(key: String) = flags.update { it.copy(pinned = it.pinned.toggle(key)) }
-    fun toggleStar(key: String) = flags.update { it.copy(starred = it.starred.toggle(key)) }
+    fun toggleStar(key: String) {
+        val nowStarred = key !in flags.value.starred
+        flags.update { it.copy(starred = it.starred.toggle(key)) }
+        state.value.conversations.firstOrNull { it.key == key }?.messages?.lastOrNull()
+            ?.let { repo.setStarred(listOf(it.localId), nowStarred) }
+    }
+
+    suspend fun fetchAttachment(localId: Long, a: Attachment): Attachment? = repo.fetchAttachment(localId, a)
+    suspend fun resolveHtml(localId: Long): String? = repo.resolveHtml(localId)
     fun toggleMute(key: String) = flags.update { it.copy(muted = it.muted.toggle(key)) }
     fun togglePriority(key: String) = flags.update { it.copy(priority = it.priority.toggle(key)) }
     fun toggleAutoArchive(key: String) = flags.update { it.copy(autoArchive = it.autoArchive.toggle(key)) }
@@ -156,6 +164,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val ids = state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
             repo.moveMessages(ids, Folder.Trash)
         } else {
+            val ids = state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
+            repo.moveMessages(ids, folder)
             flags.update {
                 val archived = if (folder == Folder.Archive) it.archived + (key to clock()) else it.archived - key
                 it.copy(archived = archived, snoozed = it.snoozed - key)

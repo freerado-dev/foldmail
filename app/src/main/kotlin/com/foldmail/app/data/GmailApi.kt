@@ -47,6 +47,24 @@ object GmailApi {
         return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }
     }
 
+    fun listIdsQuery(token: String, query: String, max: Int): List<String> {
+        val q = java.net.URLEncoder.encode(query, "UTF-8")
+        val json = JSONObject(request("GET", "$BASE/messages?q=$q&maxResults=$max", token))
+        val arr = json.optJSONArray("messages") ?: return emptyList()
+        return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }
+    }
+
+    /** Raw bytes of an attachment. */
+    fun attachment(token: String, messageId: String, attachmentId: String): ByteArray {
+        val data = JSONObject(request("GET", "$BASE/messages/$messageId/attachments/$attachmentId", token)).getString("data")
+        return Base64.getUrlDecoder().decode(data.trim())
+    }
+
+    fun modifyLabels(token: String, id: String, add: List<String>, remove: List<String>) {
+        val body = JSONObject().put("addLabelIds", JSONArray(add)).put("removeLabelIds", JSONArray(remove))
+        request("POST", "$BASE/messages/$id/modify", token, body.toString())
+    }
+
     fun getMessage(token: String, id: String): JSONObject = JSONObject(request("GET", "$BASE/messages/$id?format=full", token))
 
     fun send(token: String, rawBase64Url: String, threadId: String?) {
@@ -83,7 +101,8 @@ object GmailParser {
         val attachments = ArrayList<Attachment>()
         val plain = StringBuilder()
         val html = StringBuilder()
-        walk(payload, plain, html, attachments)
+        val inline = ArrayList<InlinePart>()
+        walk(payload, plain, html, attachments, inline)
         val body = plain.toString().ifBlank { htmlToText(html.toString()) }.trim()
 
         val localId = try { java.lang.Long.parseUnsignedLong(id, 16) } catch (_: NumberFormatException) { id.hashCode().toLong() }
@@ -101,21 +120,39 @@ object GmailParser {
             cc = splitAddresses(headers["cc"].orEmpty()).map(::decodeHeader),
             isRead = "UNREAD" !in labels,
         )
-        return ParsedMessage(MailItem(email, body, attachments, html.toString().ifBlank { null }), id, json.optString("threadId"))
+        return ParsedMessage(MailItem(email, body, attachments, html.toString().ifBlank { null }, inline), id, json.optString("threadId"))
     }
 
-    private fun walk(part: JSONObject, plain: StringBuilder, html: StringBuilder, attachments: MutableList<Attachment>) {
+    private fun walk(part: JSONObject, plain: StringBuilder, html: StringBuilder, attachments: MutableList<Attachment>, inline: MutableList<InlinePart>) {
         val mime = part.optString("mimeType")
         val filename = part.optString("filename")
         val body = part.optJSONObject("body")
+        val cid = headerValue(part, "Content-ID")?.trim()?.trim('<', '>')
+        if (!cid.isNullOrEmpty() && mime.startsWith("image/") && body != null) {
+            val data = if (body.has("data")) body.getString("data").trim().replace('-', '+').replace('_', '/') else null
+            val attId = body.optString("attachmentId").ifBlank { null }
+            if (data != null || attId != null) inline += InlinePart(cid, mime, data, attId)
+        }
         if (filename.isNotBlank()) {
-            attachments += Attachment(decodeHeader(filename), null, mime.ifBlank { "application/octet-stream" }, body?.optLong("size"))
+            attachments += Attachment(
+                decodeHeader(filename), null, mime.ifBlank { "application/octet-stream" }, body?.optLong("size"),
+                remoteId = body?.optString("attachmentId")?.ifBlank { null },
+            )
         } else if (body != null && body.has("data")) {
             val text = decodeBody(body.getString("data"), charsetOf(part))
             if (mime == "text/plain" && plain.isEmpty()) plain.append(text)
             else if (mime == "text/html" && html.isEmpty()) html.append(text)
         }
-        part.optJSONArray("parts")?.let { arr -> for (i in 0 until arr.length()) walk(arr.getJSONObject(i), plain, html, attachments) }
+        part.optJSONArray("parts")?.let { arr -> for (i in 0 until arr.length()) walk(arr.getJSONObject(i), plain, html, attachments, inline) }
+    }
+
+    private fun headerValue(part: JSONObject, name: String): String? {
+        val arr = part.optJSONArray("headers") ?: return null
+        for (i in 0 until arr.length()) {
+            val h = arr.getJSONObject(i)
+            if (h.optString("name").equals(name, true)) return h.optString("value")
+        }
+        return null
     }
 
     private fun charsetOf(part: JSONObject): Charset {

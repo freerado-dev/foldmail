@@ -11,6 +11,8 @@ data class Attachment(
     val uri: String? = null,
     val mimeType: String = "application/octet-stream",
     val sizeBytes: Long? = null,
+    /** Gmail attachment id: the file is downloaded on demand when [uri] is null. */
+    val remoteId: String? = null,
 ) {
     val isImage: Boolean get() = mimeType.startsWith("image/")
     val isVideo: Boolean get() = mimeType.startsWith("video/")
@@ -27,7 +29,12 @@ data class MailItem(
     val attachments: List<Attachment> = emptyList(),
     /** Original HTML of the mail (null for plain-text mails), shown in the full message viewer. */
     val html: String? = null,
+    /** Images referenced from the HTML as cid:... */
+    val inline: List<InlinePart> = emptyList(),
 )
+
+/** [data] is standard base64 when the image is embedded in the message, else [attachmentId] must be downloaded. */
+data class InlinePart(val cid: String, val mime: String, val data: String?, val attachmentId: String?)
 
 /** Target of "Move to" / Trash / Archive. */
 enum class Folder { Inbox, Archive, Trash }
@@ -48,6 +55,12 @@ interface MailRepository {
     fun markRead(localIds: Collection<Long>)
     /** Trash removes the messages for real (on the Gmail server too); other folders are local only. */
     fun moveMessages(localIds: Collection<Long>, folder: Folder)
+    /** Downloads a Gmail attachment to the cache; null when it is not downloadable. */
+    suspend fun fetchAttachment(localId: Long, attachment: Attachment): Attachment? = null
+    /** HTML of the message with cid: images replaced by real data. */
+    suspend fun resolveHtml(localId: Long): String? = null
+    /** Stars/unstars the messages on the server (no-op for the demo). */
+    fun setStarred(localIds: Collection<Long>, starred: Boolean) {}
     /** Re-downloads mail for all real accounts (no-op for the demo). */
     fun refresh()
     /** Stores a Google account authorised with [accessToken] and starts syncing it. */

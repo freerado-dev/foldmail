@@ -53,7 +53,11 @@ import androidx.compose.ui.unit.dp
 import com.foldmail.app.Attachment
 import com.foldmail.app.formatSize
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Downloads a remote (Gmail) attachment; provided by the app shell. */
+val LocalAttachmentFetcher = androidx.compose.runtime.staticCompositionLocalOf<suspend (Long, Attachment) -> Attachment?> { { _, _ -> null } }
 
 /** Paperclip button with the four ways of adding a file. */
 @Composable
@@ -111,9 +115,22 @@ fun PendingAttachments(items: List<Attachment>, onRemove: (Attachment) -> Unit, 
 
 /** Attachment as shown inside a message bubble; tap opens it in another app (when it has content). */
 @Composable
-fun AttachmentView(a: Attachment, modifier: Modifier = Modifier) {
+fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long = 0L) {
     val context = LocalContext.current
-    val tap = Modifier.clickable(enabled = a.uri != null) { openAttachment(context, a) }
+    val fetcher = LocalAttachmentFetcher.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val tap = Modifier.clickable(enabled = a.uri != null || a.remoteId != null) {
+        if (a.uri != null) {
+            openAttachment(context, a)
+        } else {
+            android.widget.Toast.makeText(context, "Sťahujem ${a.name}…", android.widget.Toast.LENGTH_SHORT).show()
+            scope.launch {
+                val r = try { fetcher(localId, a) } catch (_: Exception) { null }
+                if (r != null) openAttachment(context, r)
+                else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     if (a.isImage && a.uri != null) {
         Thumbnail(a, modifier.then(tap).size(width = 280.dp, height = 200.dp).clip(RoundedCornerShape(16.dp)))
     } else {

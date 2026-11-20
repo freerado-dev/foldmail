@@ -163,7 +163,7 @@ private fun MessageRow(
             Avatar(senderName, size = 24.dp)
             Spacer(Modifier.width(6.dp))
         }
-        Bubble(subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
+        Bubble(m.localId, subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
             Avatar(selfInitial, size = 24.dp)
@@ -172,7 +172,7 @@ private fun MessageRow(
 }
 
 @Composable
-private fun Bubble(subject: String?, body: String, attachments: List<Attachment>, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Bubble(localId: Long, subject: String?, body: String, attachments: List<Attachment>, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val split = remember(body) { QuoteSplitter.split(body) }
     var showQuote by rememberSaveable(body) { mutableStateOf(false) }
 
@@ -189,7 +189,7 @@ private fun Bubble(subject: String?, body: String, attachments: List<Attachment>
             }
             val text = split.fresh.trim().ifEmpty { body.trim() }
             if (text.isNotEmpty()) Text(text)
-            attachments.forEach { AttachmentView(it, Modifier.padding(top = 8.dp)) }
+            attachments.forEach { AttachmentView(it, Modifier.padding(top = 8.dp), localId) }
             if (split.quoted.isNotBlank()) {
                 Text(
                     if (showQuote) "Skryť pôvodný email" else "… pôvodný email",

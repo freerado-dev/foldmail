@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import com.foldmail.app.forwardBody
 import com.foldmail.app.prefixSubject
 import com.foldmail.app.quoteForReply
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.foldmail.app.MailViewModel
+import com.foldmail.app.Attachment
 import kotlinx.coroutines.launch
 
 enum class MainTab(val label: String, val icon: ImageVector) {
@@ -100,6 +102,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeBody by rememberSaveable { mutableStateOf("") }
     var composeReplyTo by rememberSaveable { mutableStateOf<String?>(null) }
     var composeAccount by rememberSaveable { mutableStateOf(-1L) }
+    var composeFiles by remember { mutableStateOf(emptyList<Attachment>()) }
     var draftVersion by rememberSaveable { mutableStateOf(0) }
     var viewingId by rememberSaveable { mutableStateOf<Long?>(null) }
 
@@ -142,7 +145,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; scope.launch { drawerState.close() } }
 
     fun startCompose(to: String = "") {
-        composeTo = to; composeSubject = ""; composeBody = ""; composeReplyTo = null; composeAccount = -1L
+        composeTo = to; composeSubject = ""; composeBody = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList()
         draftVersion++; composing = true; tab = MainTab.Chats
     }
     fun openChat(key: String) { openKey = key; composing = false; viewingId = null; tab = MainTab.Chats }
@@ -153,14 +156,23 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 composeTo = replyRecipients(m, a == MessageAction.ReplyAll).joinToString(", ")
                 composeSubject = prefixSubject(m.subject, "Re: ")
                 composeBody = quoteForReply(m, body, ui.names)
-                composeReplyTo = m.messageId; composeAccount = m.accountId
+                composeReplyTo = m.messageId; composeAccount = m.accountId; composeFiles = emptyList()
                 draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
             }
             MessageAction.Forward -> {
                 composeTo = ""; composeSubject = prefixSubject(m.subject, "Fwd: ")
                 composeBody = forwardBody(m, body)
                 composeReplyTo = null; composeAccount = m.accountId
-                draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
+                val atts = ui.attachments[m.localId].orEmpty()
+                scope.launch {
+                    if (atts.isNotEmpty()) Toast.makeText(context, "Pripravujem prílohy…", Toast.LENGTH_SHORT).show()
+                    val files = atts.mapNotNull { a ->
+                        if (a.uri != null) a else try { vm.fetchAttachment(m.localId, a) } catch (_: Exception) { null }
+                    }
+                    if (files.size < atts.size) Toast.makeText(context, "Niektoré prílohy sa nepodarilo stiahnuť", Toast.LENGTH_LONG).show()
+                    composeFiles = files
+                    draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
+                }
             }
             MessageAction.Delete -> { vm.deleteMessage(m.localId); viewingId = null }
             MessageAction.ShowFull -> viewingId = m.localId
@@ -170,6 +182,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var listWidthDp by rememberSaveable { mutableFloatStateOf(360f) }
     val density = LocalDensity.current.density
 
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalAttachmentFetcher provides { id: Long, a: Attachment -> vm.fetchAttachment(id, a) },
+    ) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         // Closed: our own detector opens it (so rows can use horizontal drags); open: the drawer handles closing swipes.
@@ -208,6 +223,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         initialTo = composeTo,
                         initialSubject = composeSubject,
                         initialBody = composeBody,
+                        initialAttachments = composeFiles,
                         onClose = { composing = false },
                         onSend = { to, subject, body, files ->
                             vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 })
@@ -220,6 +236,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     message = viewing, ui = ui,
                     onBack = { viewingId = null },
                     onAction = { a -> onMessageAction(a, viewing) },
+                    resolveHtml = { vm.resolveHtml(it) },
                     modifier = mod,
                 )
                 open != null -> ChatPane(
@@ -298,6 +315,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
     }
 }
+    }
     }
 
 /** Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */

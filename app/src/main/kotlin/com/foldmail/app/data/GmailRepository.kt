@@ -104,7 +104,10 @@ class GmailRepository(private val context: Context) {
 
     private suspend fun syncAccount(account: Account): List<MailItem> {
         val token = GoogleAuth.accessToken(context, account.email)
-        val ids = (GmailApi.listIds(token, "INBOX", INBOX_COUNT) + GmailApi.listIds(token, "SENT", SENT_COUNT)).distinct()
+        val ids = (
+            GmailApi.listIds(token, "INBOX", INBOX_COUNT) + GmailApi.listIds(token, "SENT", SENT_COUNT) +
+                GmailApi.listIdsQuery(token, "-in:inbox -in:sent -in:trash -in:spam -in:drafts", ARCHIVE_COUNT)
+            ).distinct()
         // Download only what is new (plus the newest few, to pick up read/unread changes).
         val toFetch = (ids.filter { !cache.containsKey("${account.id}:$it") } + ids.take(REFRESH_NEWEST)).distinct()
         val gate = Semaphore(10)
@@ -165,8 +168,26 @@ class GmailRepository(private val context: Context) {
 
     /** Trash = delete for real: removes from the list now and from Gmail in the background. */
     fun moveMessages(localIds: Collection<Long>, folder: com.foldmail.app.Folder) {
-        if (folder != com.foldmail.app.Folder.Trash || localIds.isEmpty()) return
+        if (localIds.isEmpty()) return
         val ids = localIds.toSet()
+        if (folder != com.foldmail.app.Folder.Trash) {
+            // Archive = leave the Inbox label, Inbox = get it back (received mail only).
+            val incoming = items.value.filter { it.email.localId in ids && !it.email.isOutgoing }.map { it.email.localId }
+            scope.launch {
+                try {
+                    for (id in incoming) {
+                        val (accountId, gmailId, _) = gmailIds[id] ?: continue
+                        val account = accounts.value.firstOrNull { it.id == accountId } ?: continue
+                        val token = GoogleAuth.accessToken(context, account.email)
+                        if (folder == com.foldmail.app.Folder.Archive) GmailApi.modifyLabels(token, gmailId, emptyList(), listOf("INBOX"))
+                        else GmailApi.modifyLabels(token, gmailId, listOf("INBOX"), emptyList())
+                    }
+                } catch (e: Exception) {
+                    status.value = SyncStatus(false, "Zmena v Gmaile zlyhala: ${e.message ?: e.javaClass.simpleName}")
+                }
+            }
+            return
+        }
         items.update { list -> list.filter { it.email.localId !in ids } }
         cache.entries.removeAll { it.value.email.localId in ids }
         scope.launch {
@@ -185,6 +206,56 @@ class GmailRepository(private val context: Context) {
                 sync()
             }
         }
+    }
+
+    fun setStarred(localIds: Collection<Long>, starred: Boolean) {
+        scope.launch {
+            try {
+                for (id in localIds) {
+                    val (accountId, gmailId, _) = gmailIds[id] ?: continue
+                    val account = accounts.value.firstOrNull { it.id == accountId } ?: continue
+                    val token = GoogleAuth.accessToken(context, account.email)
+                    if (starred) GmailApi.modifyLabels(token, gmailId, listOf("STARRED"), emptyList())
+                    else GmailApi.modifyLabels(token, gmailId, emptyList(), listOf("STARRED"))
+                }
+            } catch (e: Exception) {
+                status.value = SyncStatus(false, "Hviezdička v Gmaile zlyhala: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private fun tokenFor(localId: Long): Triple<String, String, Long>? {
+        val (accountId, gmailId, _) = gmailIds[localId] ?: return null
+        val account = accounts.value.firstOrNull { it.id == accountId } ?: return null
+        return Triple(account.email, gmailId, accountId)
+    }
+
+    /** Downloads an attachment into the cache and returns it with a shareable content uri. */
+    suspend fun fetchAttachment(localId: Long, a: Attachment): Attachment? = withContext(Dispatchers.IO) {
+        val attId = a.remoteId ?: return@withContext null
+        val (email, gmailId, _) = tokenFor(localId) ?: return@withContext null
+        val bytes = GmailApi.attachment(GoogleAuth.accessToken(context, email), gmailId, attId)
+        val dir = java.io.File(context.cacheDir, "mail/$gmailId").apply { mkdirs() }
+        val file = java.io.File(dir, a.name.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "priloha" })
+        file.writeBytes(bytes)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        a.copy(uri = uri.toString(), sizeBytes = bytes.size.toLong())
+    }
+
+    /** Replaces cid: references in the HTML with the embedded images. */
+    suspend fun resolveHtml(localId: Long): String? = withContext(Dispatchers.IO) {
+        val item = items.value.firstOrNull { it.email.localId == localId } ?: return@withContext null
+        var html = item.html ?: return@withContext null
+        if (item.inline.isEmpty()) return@withContext html
+        val (email, gmailId, _) = tokenFor(localId) ?: return@withContext html
+        val token = GoogleAuth.accessToken(context, email)
+        for (p in item.inline) {
+            val data = p.data ?: try {
+                java.util.Base64.getEncoder().encodeToString(GmailApi.attachment(token, gmailId, p.attachmentId ?: continue))
+            } catch (_: Exception) { continue }
+            html = html.replace(Regex("cid:" + Regex.escape(p.cid), RegexOption.IGNORE_CASE), "data:${p.mime};base64,$data")
+        }
+        html
     }
 
     fun markRead(localIds: Collection<Long>) {
@@ -206,6 +277,7 @@ class GmailRepository(private val context: Context) {
     companion object {
         private const val INBOX_COUNT = 200
         private const val SENT_COUNT = 100
+        private const val ARCHIVE_COUNT = 50
         private const val REFRESH_NEWEST = 25
         private val PALETTE = listOf(0xFFFF3B30, 0xFF0A28F0, 0xFF34C759, 0xFFFFCC00, 0xFFAF52DE, 0xFFFF2D55, 0xFF5AC8FA)
     }
