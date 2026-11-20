@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -33,9 +35,11 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -46,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.foldmail.app.MailViewModel
+import kotlinx.coroutines.launch
 
 enum class MainTab(val label: String, val icon: ImageVector) {
     Chats("Chaty", Icons.Filled.ChatBubble),
@@ -81,21 +86,42 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
 
     val open = ui.conversations.firstOrNull { it.key == openKey }
 
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val rowActions = RowActions(
+        togglePin = vm::togglePin, toggleStar = vm::toggleStar, toggleMute = vm::toggleMute,
+        togglePriority = vm::togglePriority, toggleAutoArchive = vm::toggleAutoArchive,
+        block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo,
+    )
+    fun showList() { tab = MainTab.Chats; openKey = null; composing = false; scope.launch { drawerState.close() } }
+
     fun startCompose(to: String = "") { composeTo = to; composing = true; tab = MainTab.Chats }
     fun openChat(key: String) { openKey = key; composing = false; tab = MainTab.Chats }
 
     var listWidthDp by rememberSaveable { mutableFloatStateOf(360f) }
     val density = LocalDensity.current.density
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AccountsDrawer(
+                ui,
+                onSelectAccount = { vm.selectAccount(it); showList() },
+                onView = { vm.setView(it); showList() },
+            )
+        },
+    ) {
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val expanded = maxWidth >= ExpandedBreakpoint
 
         val listPane: @Composable (Modifier) -> Unit = { mod ->
             ConversationListPane(
                 ui, selectedKey = if (expanded) openKey else null, onOpen = ::openChat,
-                onTogglePin = vm::togglePin, onToggleStar = vm::toggleStar,
+                actions = rowActions,
+                onView = vm::setView,
+                onOpenDrawer = { scope.launch { drawerState.open() } },
                 modifier = mod,
-                heading = if (tab == MainTab.Groups) "Skupiny" else "Zjednotené",
+                heading = if (tab == MainTab.Groups) "Skupiny" else null,
                 groupsOnly = tab == MainTab.Groups,
             )
         }
@@ -180,6 +206,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
     }
 }
+    }
 
 /** Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */
 @Composable

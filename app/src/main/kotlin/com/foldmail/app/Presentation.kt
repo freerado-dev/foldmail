@@ -3,9 +3,11 @@ package com.foldmail.app
 import com.foldmail.domain.model.EmailMessage
 import com.foldmail.domain.model.normalizeAddress
 import com.foldmail.domain.threading.PersonConversation
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -85,4 +87,22 @@ fun formatSize(bytes: Long?): String = when {
     bytes >= 1_000_000 -> String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0)
     bytes >= 1_000 -> "${bytes / 1_000} kB"
     else -> "$bytes B"
+}
+
+/** One entry of the "later" part of the More menu. */
+data class SnoozeOption(val label: String, val detail: String, val atMillis: Long)
+
+/** Later today (+3 h, at most 23:59), tomorrow 9:00 and next Monday 9:00. */
+fun snoozeOptions(now: Long, zone: ZoneId = ZoneId.systemDefault()): List<SnoozeOption> {
+    val dt = Instant.ofEpochMilli(now).atZone(zone)
+    var later = dt.plusHours(3).withSecond(0).withNano(0)
+    if (later.toLocalDate() != dt.toLocalDate()) later = dt.withHour(23).withMinute(59).withSecond(0).withNano(0)
+    val tomorrow = dt.toLocalDate().plusDays(1).atTime(9, 0).atZone(zone)
+    val monday = dt.toLocalDate().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atTime(9, 0).atZone(zone)
+    fun day(z: java.time.ZonedDateTime) = z.dayOfWeek.getDisplayName(TextStyle.FULL, Sk)
+    return listOf(
+        SnoozeOption("Neskôr dnes", DateTimeFormatter.ofPattern("HH:mm").format(later), later.toInstant().toEpochMilli()),
+        SnoozeOption("Zajtra", "${day(tomorrow)}, 9:00", tomorrow.toInstant().toEpochMilli()),
+        SnoozeOption("Budúci týždeň", "${day(monday)}, 9:00", monday.toInstant().toEpochMilli()),
+    )
 }

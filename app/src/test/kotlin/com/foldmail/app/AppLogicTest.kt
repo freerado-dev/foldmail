@@ -38,6 +38,21 @@ class AppLogicTest {
         assertEquals("2.5 MB", formatSize(file.sizeBytes))
     }
 
+    @Test fun snoozeOptionsAreInTheFutureAndAtNineAm() {
+        val z = ZoneId.of("UTC")
+        val o = snoozeOptions(now, z)
+        assertEquals(3, o.size)
+        assertTrue(o.all { it.atMillis > now })
+        val tomorrow = java.time.Instant.ofEpochMilli(o[1].atMillis).atZone(z)
+        assertEquals(9, tomorrow.hour)
+        assertEquals(java.time.DayOfWeek.MONDAY, java.time.Instant.ofEpochMilli(o[2].atMillis).atZone(z).dayOfWeek)
+    }
+
+    @Test fun demoAccountsCoverEveryMessage() {
+        val ids = DemoData.accounts.map { it.id }.toSet()
+        assertTrue(DemoData.items(now).all { it.email.accountId in ids })
+    }
+
     @Test fun markReadClearsUnread() {
         val r = repo()
         val anna = convs(r).first { "anna@example.com" in it.participants }

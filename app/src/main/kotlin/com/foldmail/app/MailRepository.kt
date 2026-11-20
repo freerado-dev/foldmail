@@ -17,6 +17,9 @@ data class Attachment(
     val isPdf: Boolean get() = mimeType == "application/pdf"
 }
 
+/** A mailbox account shown in the drawer. [colorArgb] is the accent bar colour. */
+data class Account(val id: Long, val name: String, val email: String, val colorArgb: Long)
+
 /** A message together with its body text (the domain model carries headers only). */
 data class MailItem(val email: EmailMessage, val body: String, val attachments: List<Attachment> = emptyList())
 
@@ -27,7 +30,8 @@ data class MailItem(val email: EmailMessage, val body: String, val attachments: 
 interface MailRepository {
     val items: StateFlow<List<MailItem>>
     val accountAddress: String
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList())
+    val accounts: List<Account>
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList(), accountId: Long = 1)
     fun markRead(localIds: Collection<Long>)
 }
 
@@ -38,16 +42,17 @@ class InMemoryMailRepository(
 ) : MailRepository {
 
     override val accountAddress: String = DemoData.ME
+    override val accounts: List<Account> = DemoData.accounts
     private val state = MutableStateFlow(seed)
     override val items: StateFlow<List<MailItem>> = state
 
-    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>) {
+    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
         state.update { list ->
             val id = (list.maxOfOrNull { it.email.localId } ?: 0L) + 1
             val parent = inReplyTo?.let { ref -> list.firstOrNull { it.email.messageId == ref }?.email }
             val mail = EmailMessage(
                 localId = id,
-                accountId = 1,
+                accountId = accountId,
                 messageId = "<local-$id@foldmail.app>",
                 inReplyTo = inReplyTo,
                 references = parent?.let { it.references + listOfNotNull(it.messageId) } ?: emptyList(),

@@ -5,6 +5,12 @@ import com.foldmail.domain.model.EmailMessage
 /** Sample mailbox so the UI is usable before any real account/sync exists. */
 object DemoData {
     const val ME = "me@foldmail.app"
+
+    val accounts = listOf(
+        Account(1, "Rado H", "freerado@gmail.com", 0xFFFF3B30),
+        Account(2, "Radoslav Halabrin", "info@omegareality.sk", 0xFF0A28F0),
+        Account(3, "dokonaly zivot", "mam@dokonalyzivot.sk", 0xFF34C759),
+    )
     private const val MIN = 60_000L
     private const val HOUR = 60 * MIN
     private const val DAY = 24 * HOUR
