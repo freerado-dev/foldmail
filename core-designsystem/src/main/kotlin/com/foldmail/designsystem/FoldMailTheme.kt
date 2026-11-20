@@ -7,7 +7,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Typography
 
 /** Apple-like palette: white surfaces, soft grey panels, one blue accent. */
 object FoldColors {
@@ -40,11 +43,30 @@ private val FoldShapes = Shapes(
     large = RoundedCornerShape(28.dp),
 )
 
+/** Everything is ~13% smaller than Material defaults (never below 11sp) so more text fits on the Fold. */
+private const val FontScale = 0.87f
+
+private fun TextStyle.scaled(): TextStyle {
+    val size = (fontSize.value * FontScale).coerceAtLeast(11f)
+    return copy(fontSize = size.sp, lineHeight = (lineHeight.value * size / fontSize.value).sp)
+}
+
+private val FoldTypography = Typography().let { t ->
+    Typography(
+        displayLarge = t.displayLarge.scaled(), displayMedium = t.displayMedium.scaled(), displaySmall = t.displaySmall.scaled(),
+        headlineLarge = t.headlineLarge.scaled(), headlineMedium = t.headlineMedium.scaled(), headlineSmall = t.headlineSmall.scaled(),
+        titleLarge = t.titleLarge.scaled(), titleMedium = t.titleMedium.scaled(), titleSmall = t.titleSmall.scaled(),
+        bodyLarge = t.bodyLarge.scaled(), bodyMedium = t.bodyMedium.scaled(), bodySmall = t.bodySmall.scaled(),
+        labelLarge = t.labelLarge.scaled(), labelMedium = t.labelMedium.scaled(), labelSmall = t.labelSmall.scaled(),
+    )
+}
+
 @Composable
 fun FoldMailTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (darkTheme) Dark else Light,
         shapes = FoldShapes,
+        typography = FoldTypography,
         content = content,
     )
 }
