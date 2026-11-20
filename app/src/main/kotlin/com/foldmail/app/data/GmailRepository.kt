@@ -106,7 +106,7 @@ class GmailRepository(private val context: Context) {
         val token = GoogleAuth.accessToken(context, account.email)
         val ids = (GmailApi.listIds(token, "INBOX", INBOX_COUNT) + GmailApi.listIds(token, "SENT", SENT_COUNT)).distinct()
         // Download only what is new (plus the newest few, to pick up read/unread changes).
-        val toFetch = (ids.filter { "${account.id}:$it" !in cache } + ids.take(REFRESH_NEWEST)).distinct()
+        val toFetch = (ids.filter { !cache.containsKey("${account.id}:$it") } + ids.take(REFRESH_NEWEST)).distinct()
         val gate = Semaphore(10)
         coroutineScope {
             toFetch.map { id ->
