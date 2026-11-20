@@ -7,7 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.ContactsContract
+import android.provider.ContactsContract.CommonDataKinds.Email
+import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -306,10 +307,10 @@ private fun dial(context: Context, email: String) {
 
 private fun findPhone(context: Context, email: String): String? {
     val cr = context.contentResolver
-    val emailKind = ContactsContract.CommonDataKinds.Email
-    val phoneKind = ContactsContract.CommonDataKinds.Phone
-    val id = cr.query(emailKind.CONTENT_URI, arrayOf(emailKind.CONTACT_ID), "${emailKind.ADDRESS} = ?", arrayOf(email), null)
-        ?.use { if (it.moveToFirst()) it.getLong(0) else null } ?: return null
-    return cr.query(phoneKind.CONTENT_URI, arrayOf(phoneKind.NUMBER), "${phoneKind.CONTACT_ID} = ?", arrayOf(id.toString()), null)
-        ?.use { if (it.moveToFirst()) it.getString(0) else null }
+    val id = cr.query(
+        Email.CONTENT_URI, arrayOf(Email.CONTACT_ID), "${Email.ADDRESS} = ?", arrayOf(email), null,
+    )?.use { if (it.moveToFirst()) it.getLong(0) else null } ?: return null
+    return cr.query(
+        Phone.CONTENT_URI, arrayOf(Phone.NUMBER), "${Phone.CONTACT_ID} = ?", arrayOf(id.toString()), null,
+    )?.use { if (it.moveToFirst()) it.getString(0) else null }
 }
