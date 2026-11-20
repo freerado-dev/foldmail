@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -113,37 +114,82 @@ fun PendingAttachments(items: List<Attachment>, onRemove: (Attachment) -> Unit, 
     }
 }
 
-/** Attachment as shown inside a message bubble; tap opens it in another app (when it has content). */
+/** Attachment as shown inside a message: thumbnail (images, PDF first page), tap = open, arrow = save to Downloads. */
 @Composable
 fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long = 0L) {
     val context = LocalContext.current
     val fetcher = LocalAttachmentFetcher.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val tap = Modifier.clickable(enabled = a.uri != null || a.remoteId != null) {
-        if (a.uri != null) {
-            openAttachment(context, a)
-        } else {
-            android.widget.Toast.makeText(context, "Sťahujem ${a.name}…", android.widget.Toast.LENGTH_SHORT).show()
-            scope.launch {
-                val r = try { fetcher(localId, a) } catch (_: Exception) { null }
-                if (r != null) openAttachment(context, r)
-                else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_LONG).show()
-            }
+    var local by remember(a) { mutableStateOf(if (a.uri != null) a else null) }
+    // Thumbnails: download small images / PDFs automatically.
+    androidx.compose.runtime.LaunchedEffect(a) {
+        if (local == null && a.remoteId != null && (a.isImage || a.isPdf) && (a.sizeBytes ?: 0L) < 8_000_000L) {
+            local = try { fetcher(localId, a) } catch (_: Exception) { null }
         }
     }
-    if (a.isImage && a.uri != null) {
-        Thumbnail(a, modifier.then(tap).size(width = 280.dp, height = 200.dp).clip(RoundedCornerShape(16.dp)))
-    } else {
-        Surface(color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(16.dp), modifier = modifier.fillMaxWidth().then(tap)) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(iconFor(a), null, Modifier.size(28.dp))
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    val size = formatSize(a.sizeBytes)
-                    if (size.isNotEmpty()) Text(size, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val shown = local ?: a
+
+    suspend fun ensure(): Attachment? = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }?.also { local = it }
+    fun toast(t: String) = android.widget.Toast.makeText(context, t, android.widget.Toast.LENGTH_SHORT).show()
+
+    val open: () -> Unit = {
+        scope.launch {
+            if (shown.uri == null) toast("Sťahujem ${a.name}…")
+            val r = ensure()
+            if (r != null) openAttachment(context, r) else toast("Prílohu sa nepodarilo stiahnuť")
+        }
+    }
+    val save: () -> Unit = {
+        scope.launch {
+            val r = ensure()
+            if (r != null && saveToDownloads(context, r)) toast("Uložené do Stiahnuté: ${a.name}") else toast("Uloženie zlyhalo")
+        }
+    }
+    val tap = Modifier.clickable(enabled = shown.uri != null || a.remoteId != null, onClick = open)
+    val hasThumb = shown.uri != null && (shown.isImage || shown.isPdf)
+
+    Box(modifier) {
+        if (hasThumb) {
+            Thumbnail(shown, Modifier.then(tap).size(width = 280.dp, height = 200.dp).clip(RoundedCornerShape(16.dp)))
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(6.dp).size(32.dp).clip(CircleShape)
+                    .background(Color(0x99000000)).clickable(onClick = save),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.Download, "Stiahnuť", Modifier.size(18.dp), tint = Color.White) }
+        } else {
+            Surface(color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().then(tap)) {
+                Row(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(iconFor(a), null, Modifier.size(28.dp))
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                        val size = formatSize(shown.sizeBytes ?: a.sizeBytes)
+                        if (size.isNotEmpty()) Text(size, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (shown.uri != null || a.remoteId != null) {
+                        IconButton(onClick = save) { Icon(Icons.Filled.Download, "Stiahnuť do zariadenia") }
+                    }
                 }
             }
         }
+    }
+}
+
+/** Copies the file into the public Downloads folder. */
+private suspend fun saveToDownloads(context: Context, a: Attachment): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val src = context.contentResolver.openInputStream(Uri.parse(a.uri ?: return@withContext false)) ?: return@withContext false
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, a.name)
+            put(android.provider.MediaStore.Downloads.MIME_TYPE, a.mimeType)
+            put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+            put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val target = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return@withContext false
+        src.use { input -> context.contentResolver.openOutputStream(target)?.use { out -> input.copyTo(out) } }
+        context.contentResolver.update(target, android.content.ContentValues().apply { put(android.provider.MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        true
+    } catch (_: Exception) {
+        false
     }
 }
 
@@ -156,13 +202,28 @@ private fun iconFor(a: Attachment) = when {
 @Composable
 private fun Thumbnail(a: Attachment, modifier: Modifier) {
     val context = LocalContext.current
-    val bitmap by produceState<Bitmap?>(null, a.uri) { value = withContext(Dispatchers.IO) { decodeSampled(context, Uri.parse(a.uri), 640) } }
+    val bitmap by produceState<Bitmap?>(null, a.uri) { value = withContext(Dispatchers.IO) { if (a.isPdf) renderPdf(context, Uri.parse(a.uri), 560) else decodeSampled(context, Uri.parse(a.uri), 640) } }
     val bmp = bitmap
     if (bmp != null) {
         Image(bmp.asImageBitmap(), a.name, modifier, contentScale = ContentScale.Crop)
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
     }
+}
+
+private fun renderPdf(context: Context, uri: Uri, widthPx: Int): Bitmap? = try {
+    context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+        android.graphics.pdf.PdfRenderer(fd).use { r ->
+            r.openPage(0).use { page ->
+                val h = (widthPx.toFloat() / page.width * page.height).toInt()
+                val bmp = Bitmap.createBitmap(widthPx, h, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
+                page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                bmp
+            }
+        }
+    }
+} catch (_: Exception) {
+    null
 }
 
 private fun decodeSampled(context: Context, uri: Uri, maxPx: Int): Bitmap? = try {

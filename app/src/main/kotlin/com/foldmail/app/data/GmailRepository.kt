@@ -241,12 +241,13 @@ class GmailRepository(private val context: Context) {
     suspend fun fetchAttachment(localId: Long, a: Attachment): Attachment? = withContext(Dispatchers.IO) {
         val attId = a.remoteId ?: return@withContext null
         val (email, gmailId, _) = tokenFor(localId) ?: return@withContext null
-        val bytes = GmailApi.attachment(GoogleAuth.accessToken(context, email), gmailId, attId)
         val dir = java.io.File(context.cacheDir, "mail/$gmailId").apply { mkdirs() }
         val file = java.io.File(dir, a.name.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "priloha" })
-        file.writeBytes(bytes)
+        if (!file.exists() || file.length() == 0L) {
+            file.writeBytes(GmailApi.attachment(GoogleAuth.accessToken(context, email), gmailId, attId))
+        }
         val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-        a.copy(uri = uri.toString(), sizeBytes = bytes.size.toLong())
+        a.copy(uri = uri.toString(), sizeBytes = file.length())
     }
 
     /** Replaces cid: references in the HTML with the embedded images. */

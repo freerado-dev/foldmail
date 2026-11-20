@@ -104,6 +104,8 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeAccount by rememberSaveable { mutableStateOf(-1L) }
     var composeFiles by remember { mutableStateOf(emptyList<Attachment>()) }
     var draftVersion by rememberSaveable { mutableStateOf(0) }
+    val chatsListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val groupsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     var viewingId by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val open = ui.conversations.firstOrNull { it.key == openKey }
@@ -184,6 +186,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAttachmentFetcher provides { id: Long, a: Attachment -> vm.fetchAttachment(id, a) },
+        LocalHtmlResolver provides { id: Long -> vm.resolveHtml(id) },
     ) {
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -214,6 +217,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 modifier = mod,
                 heading = if (tab == MainTab.Groups) "Skupiny" else null,
                 groupsOnly = tab == MainTab.Groups,
+                listState = if (tab == MainTab.Groups) groupsListState else chatsListState,
             )
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->

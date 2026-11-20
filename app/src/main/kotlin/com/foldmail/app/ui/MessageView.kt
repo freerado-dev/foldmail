@@ -8,6 +8,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +55,36 @@ import com.foldmail.app.nameOf
 import com.foldmail.app.wrapHtml
 import com.foldmail.domain.model.EmailMessage
 import com.foldmail.domain.model.normalizeAddress
+
+/** Resolves cid: images of a message's HTML; provided by the app shell. */
+val LocalHtmlResolver = androidx.compose.runtime.staticCompositionLocalOf<suspend (Long) -> String?> { { null } }
+
+/** A rich mail rendered inline as the sender made it. Tap opens the full viewer, long press selects. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun RichHtmlCard(
+    message: EmailMessage, rawHtml: String, plain: String, selected: Boolean,
+    onOpen: () -> Unit, onSelect: () -> Unit, modifier: Modifier = Modifier,
+) {
+    val resolver = LocalHtmlResolver.current
+    val html by androidx.compose.runtime.produceState(rawHtml, message.localId) {
+        value = try { resolver(message.localId) } catch (_: Exception) { null } ?: rawHtml
+    }
+    androidx.compose.material3.Surface(
+        color = androidx.compose.ui.graphics.Color.White,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+        modifier = modifier.widthIn(max = 640.dp),
+    ) {
+        androidx.compose.foundation.layout.Box {
+            HtmlView(html, plain, Modifier.fillMaxWidth(), inline = true)
+            // Transparent layer on top: the WebView never steals scroll gestures from the chat list.
+            androidx.compose.foundation.layout.Box(
+                Modifier.matchParentSize().combinedClickable(onClick = onOpen, onLongClick = onSelect),
+            )
+        }
+    }
+}
 
 enum class MessageAction { Reply, ReplyAll, Forward, Delete, ShowFull }
 
@@ -104,7 +137,7 @@ private fun ActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
 /** Renders the email as HTML (like a mail client) – falls back to the plain text. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier) {
+fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline: Boolean = false) {
     val page = remember(html, plain) { wrapHtml(html, plain) }
     AndroidView(
         modifier = modifier,
@@ -113,7 +146,10 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier) {
                 settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
-                settings.builtInZoomControls = true
+                settings.builtInZoomControls = !inline
+                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                settings.loadsImagesAutomatically = true
+                if (inline) { isVerticalScrollBarEnabled = false; isHorizontalScrollBarEnabled = false; overScrollMode = android.view.View.OVER_SCROLL_NEVER }
                 settings.displayZoomControls = false
                 settings.allowFileAccess = false
                 setBackgroundColor(android.graphics.Color.WHITE)

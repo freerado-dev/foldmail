@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.foldmail.app.Attachment
 import com.foldmail.app.MailUiState
 import com.foldmail.app.formatChatStamp
+import com.foldmail.app.isRichHtml
 import com.foldmail.app.nameOf
 import com.foldmail.app.title
 import com.foldmail.domain.model.EmailMessage
@@ -126,6 +127,8 @@ fun ChatPane(
                         attachments = ui.attachments[m.localId].orEmpty(),
                         senderName = nameOf(normalizeAddress(m.from), ui.names),
                         selfInitial = ui.selfAddress.take(1).uppercase().ifEmpty { "J" },
+                        html = ui.htmls[m.localId],
+                        onOpenFull = { onAction(MessageAction.ShowFull, m) },
                         selected = selectedId == m.localId,
                         onClick = { selectedId = if (selectedId == m.localId) null else m.localId },
                     )
@@ -150,6 +153,8 @@ private fun MessageRow(
     attachments: List<Attachment>,
     senderName: String,
     selfInitial: String,
+    html: String?,
+    onOpenFull: () -> Unit,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -163,7 +168,15 @@ private fun MessageRow(
             Avatar(senderName, size = 24.dp)
             Spacer(Modifier.width(6.dp))
         }
-        Bubble(m.localId, subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
+        if (isRichHtml(html)) {
+            Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (!subject.isNullOrBlank()) Text(subject, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                RichHtmlCard(m, html!!, body, selected, onOpen = onOpenFull, onSelect = onClick)
+                attachments.forEach { AttachmentView(it, Modifier.padding(top = 4.dp), m.localId) }
+            }
+        } else {
+            Bubble(m.localId, subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
+        }
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
             Avatar(selfInitial, size = 24.dp)

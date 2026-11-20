@@ -76,6 +76,7 @@ fun ConversationListPane(
     modifier: Modifier = Modifier,
     heading: String? = null,
     groupsOnly: Boolean = false,
+    listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
 ) {
     var pinnedOpen by rememberSaveable { mutableStateOf(true) }
     var revealedKey by remember { mutableStateOf<String?>(null) }
@@ -142,7 +143,7 @@ fun ConversationListPane(
             )
         }
 
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState) {
             if (pinned.isNotEmpty()) {
                 item(key = "hdr-pinned") {
                     SectionHeader("Pripnuté (${pinned.size})", expandable = true, open = pinnedOpen) { pinnedOpen = !pinnedOpen }

@@ -119,6 +119,10 @@ fun forwardBody(m: EmailMessage, body: String): String =
     "\n\n---------- Preposlaná správa ----------\nOd: ${m.from}\nDátum: ${formatChatStamp(m.sentAtMillis)}\n" +
         "Predmet: ${m.subject}\nKomu: ${m.to.joinToString(", ")}\n\n${body.trim()}"
 
+/** True for mails whose layout matters (images, tables): they are shown rendered instead of as text. */
+fun isRichHtml(html: String?): Boolean =
+    html != null && Regex("<img|<table|background", RegexOption.IGNORE_CASE).containsMatchIn(html)
+
 /** Full HTML document for the message viewer (readable on a phone, images fit the width). */
 fun wrapHtml(html: String?, plain: String): String {
     val inner = html?.takeIf { it.isNotBlank() } ?: run {
