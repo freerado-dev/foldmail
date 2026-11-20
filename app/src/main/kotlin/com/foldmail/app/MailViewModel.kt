@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
@@ -38,6 +39,8 @@ data class MailUiState(
     val bodies: Map<Long, String> = emptyMap(),
     val attachments: Map<Long, List<Attachment>> = emptyMap(),
     val htmls: Map<Long, String> = emptyMap(),
+    /** Pre-computed one-line previews of each conversation's last message. */
+    val previews: Map<Long, String> = emptyMap(),
     val names: Map<String, String> = emptyMap(),
     val selfAddress: String = "",
     val accounts: List<Account> = emptyList(),
@@ -93,10 +96,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             if (view == ListView.Archived) isArchived
             else !isArchived && k !in f.blocked && (f.snoozed[k] ?: 0L) <= now
         }
+        val bodies = items.associate { it.email.localId to it.body }
         MailUiState(
             conversations = visible,
-            bodies = items.associate { it.email.localId to it.body },
+            bodies = bodies,
             attachments = items.associate { it.email.localId to it.attachments },
+            previews = visible.associate { it.last.localId to previewOf(bodies[it.last.localId].orEmpty()) },
             htmls = items.mapNotNull { m -> m.html?.let { m.email.localId to it } }.toMap(),
             names = nameDirectory(emails),
             selfAddress = repo.accountAddress,
@@ -109,7 +114,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             syncError = sm.first.error,
             message = sm.second,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
 
     /** [accountId] null = the account currently selected in the drawer, else the first one. */
     fun send(

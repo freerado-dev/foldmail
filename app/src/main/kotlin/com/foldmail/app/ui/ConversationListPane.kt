@@ -94,7 +94,7 @@ fun ConversationListPane(
             }
     }
     val pinned = if (view == ListView.Archived) emptyList() else visible.filter { it.key in ui.pinned }
-    val sections = visible.filter { it !in pinned }.groupBy { sectionOf(it.last.sentAtMillis) }
+    val sections = remember(visible, pinned) { visible.filter { it !in pinned }.groupBy { sectionOf(it.last.sentAtMillis) } }
 
     val account = ui.accounts.firstOrNull { it.id == ui.selectedAccount }
     val title = heading ?: when {
@@ -189,7 +189,7 @@ private fun ConversationRow(
     onSwipeRight: () -> Unit,
     onMore: () -> Unit,
 ) {
-    val title = c.title(ui.names, ui.selfAddress)
+    val title = remember(c, ui.names, ui.selfAddress) { c.title(ui.names, ui.selfAddress) }
     val unread = c.unreadCount > 0
     val last = c.last
     val hasAttachment = ui.attachments[last.localId].orEmpty().isNotEmpty()
@@ -232,7 +232,7 @@ private fun ConversationRow(
                 }
                 Text(last.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, style = subjectStyle)
                 val preview = (if (hasAttachment) "[Prílohy] " else "") +
-                    (if (last.isOutgoing) "Ty: " else "") + previewOf(ui.bodies[last.localId].orEmpty())
+                    (if (last.isOutgoing) "Ty: " else "") + (ui.previews[last.localId] ?: previewOf(ui.bodies[last.localId].orEmpty()))
                 Text(preview, maxLines = 1, overflow = TextOverflow.Ellipsis, style = previewStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (unread) {

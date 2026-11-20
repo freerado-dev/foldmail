@@ -26,9 +26,15 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Optimised build (R8 + shrink) is much smoother than debug; signed with the fixed key so
+            // it installs over the previous builds and keeps the registered SHA-1.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+    lint { checkReleaseBuilds = false }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

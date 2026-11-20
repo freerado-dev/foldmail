@@ -17,17 +17,17 @@ jobs:
       - run: chmod +x gradlew
       - name: Unit tests
         run: ./gradlew :core-domain:test :app:testDebugUnitTest --stacktrace
-      - name: Assemble debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Assemble optimised APK
+        run: ./gradlew assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: foldmail-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk
       - name: Publish release
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk FoldMail-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk FoldMail-debug.apk
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest FoldMail-debug.apk --title "FoldMail debug APK" --notes "Automatický build z commitu ${GITHUB_SHA::7}" --target "$GITHUB_SHA"
