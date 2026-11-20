@@ -1,0 +1,32 @@
+package com.foldmail.app.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.foldmail.app.initialOf
+
+private val AvatarColors = listOf(
+    Color(0xFF0071E3), Color(0xFF34C759), Color(0xFFFF9500), Color(0xFFAF52DE), Color(0xFFFF2D55), Color(0xFF5AC8FA),
+)
+
+@Composable
+fun Avatar(title: String, size: Dp = 48.dp, modifier: Modifier = Modifier) {
+    val color = AvatarColors[(title.hashCode() and Int.MAX_VALUE) % AvatarColors.size]
+    Box(
+        modifier.size(size).clip(CircleShape).background(color),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(initialOf(title), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = (size.value * 0.42f).sp)
+    }
+}
