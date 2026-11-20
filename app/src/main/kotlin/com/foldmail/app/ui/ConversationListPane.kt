@@ -21,9 +21,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +54,12 @@ import com.foldmail.app.sectionOf
 import com.foldmail.app.title
 import com.foldmail.domain.threading.PersonConversation
 
-enum class ListFilter(val label: String) { All("Všetky"), Notes("Poznámky"), Starred("S hviezdičkou") }
+/** Tabs are icon-only so they never run out of room when the list pane is dragged narrow. */
+enum class ListFilter(val label: String, val icon: ImageVector) {
+    All("Všetky", Icons.Filled.Inbox),
+    Notes("Poznámky", Icons.Filled.StickyNote2),
+    Starred("S hviezdičkou", Icons.Filled.Star),
+}
 
 private val AccountColors = listOf(Color(0xFFFF3B30), Color(0xFF34C759), Color(0xFF0A28F0), Color(0xFFFF9500))
 private fun accountColor(id: Long) = AccountColors[((id - 1).toInt().coerceAtLeast(0)) % AccountColors.size]
@@ -99,20 +108,20 @@ fun ConversationListPane(
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+        Row(Modifier.fillMaxWidth()) {
             ListFilter.entries.forEach { f ->
+                val active = f == filter
                 Column(
-                    Modifier.clickable { filter = f }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    Modifier.weight(1f).clickable { filter = f }.padding(top = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
-                        f.label,
-                        fontWeight = if (f == filter) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (f == filter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    Icon(
+                        f.icon, contentDescription = f.label,
+                        tint = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Box(
-                        Modifier.padding(top = 6.dp).height(3.dp).width(28.dp)
-                            .background(if (f == filter) MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                        Modifier.padding(top = 6.dp).height(3.dp).fillMaxWidth(0.5f)
+                            .background(if (active) MaterialTheme.colorScheme.onSurface else Color.Transparent),
                     )
                 }
             }
@@ -197,7 +206,7 @@ private fun ConversationRow(
                 val preview = (if (hasAttachment) "[Prílohy] " else "") +
                     (if (last.isOutgoing) "Ty: " else "") + previewOf(ui.bodies[last.localId].orEmpty())
                 Text(
-                    preview, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    preview, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

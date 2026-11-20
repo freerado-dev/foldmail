@@ -36,8 +36,10 @@ fun PersonConversation.title(names: Map<String, String>, selfAddress: String): S
 
 fun initialOf(title: String): String = title.trim().firstOrNull()?.uppercase() ?: "?"
 
+/** Body text without quoted lines, flattened to one string so the list can wrap it over two lines. */
 fun previewOf(body: String): String =
-    body.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.startsWith(">") } ?: ""
+    body.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
+        .joinToString(" ").take(240)
 
 private fun day(millis: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
 
