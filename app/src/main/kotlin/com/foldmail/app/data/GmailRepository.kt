@@ -4,6 +4,7 @@ import android.content.Context
 import com.foldmail.app.Account
 import com.foldmail.app.Attachment
 import com.foldmail.app.MailItem
+import com.foldmail.app.slim
 import com.foldmail.app.SyncStatus
 import com.foldmail.domain.model.EmailMessage
 import com.foldmail.domain.model.normalizeAddress
