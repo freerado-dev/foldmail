@@ -264,10 +264,12 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         initialCc = composeCc,
                         initialAttachments = composeFiles,
                         contacts = ui.contacts,
+                        accounts = ui.accounts,
+                        initialAccountId = composeAccount.takeIf { it >= 0 } ?: ui.selectedAccount ?: ui.accounts.firstOrNull()?.id ?: -1L,
                         names = ui.names,
                         onClose = { composing = false },
-                        onSend = { to, subject, body, files, cc, bcc ->
-                            vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 }, cc, bcc)
+                        onSend = { to, subject, body, files, cc, bcc, accountId ->
+                            vm.send(to, subject, body, composeReplyTo, files, accountId.takeIf { it >= 0 } ?: composeAccount.takeIf { it >= 0 }, cc, bcc)
                             composing = false
                         },
                         modifier = mod,

@@ -15,6 +15,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -89,13 +96,18 @@ fun ComposePane(
     initialAttachments: List<Attachment> = emptyList(),
     contacts: List<String> = emptyList(),
     names: Map<String, String> = emptyMap(),
+    accounts: List<com.foldmail.app.Account> = emptyList(),
+    initialAccountId: Long = -1L,
     onClose: () -> Unit,
-    onSend: (to: List<String>, subject: String, body: String, attachments: List<Attachment>, cc: List<String>, bcc: List<String>) -> Unit,
+    onSend: (to: List<String>, subject: String, body: String, attachments: List<Attachment>, cc: List<String>, bcc: List<String>, accountId: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var to by rememberSaveable(initialTo) { mutableStateOf(initialTo) }
     var cc by rememberSaveable { mutableStateOf(initialCc) }
     var bcc by rememberSaveable { mutableStateOf("") }
+    var accountId by rememberSaveable { mutableStateOf(initialAccountId) }
+    var pickAccount by remember { mutableStateOf(false) }
+    val from = accounts.firstOrNull { it.id == accountId } ?: accounts.firstOrNull()
     var showCc by rememberSaveable { mutableStateOf(initialCc.isNotBlank()) }
     var subject by rememberSaveable { mutableStateOf(initialSubject) }
     var body by rememberSaveable { mutableStateOf(initialBody) }
@@ -113,7 +125,7 @@ fun ComposePane(
             IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Zavrieť") }
             Text("Nový email", Modifier.padding(start = 4.dp).weight(1f), style = MaterialTheme.typography.titleMedium)
             AttachMenuButton(actions)
-            IconButton(enabled = canSend, onClick = { onSend(recipients, subject.trim(), body.trim(), pending.toList(), ccList, bccList) }) {
+            IconButton(enabled = canSend, onClick = { onSend(recipients, subject.trim(), body.trim(), pending.toList(), ccList, bccList, from?.id ?: accountId) }) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send, contentDescription = "Odoslať",
                     tint = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -121,6 +133,36 @@ fun ComposePane(
             }
         }
         Column(Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (from != null) {
+                Box {
+                    Row(
+                        Modifier.fillMaxWidth().clickable(enabled = accounts.size > 1) { pickAccount = true }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Z", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp))
+                        Box(Modifier.size(width = 4.dp, height = 14.dp).clip(RoundedCornerShape(2.dp)).background(Color(from.colorArgb)))
+                        Text(from.email, Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, fontWeight = FontWeight.Medium)
+                        if (accounts.size > 1) Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Vybrať účet")
+                    }
+                    DropdownMenu(expanded = pickAccount, onDismissRequest = { pickAccount = false }) {
+                        accounts.forEach { a ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(width = 4.dp, height = 14.dp).clip(RoundedCornerShape(2.dp)).background(Color(a.colorArgb)))
+                                        Column(Modifier.padding(start = 10.dp)) {
+                                            Text(a.email, fontWeight = if (a.id == from.id) FontWeight.SemiBold else FontWeight.Normal)
+                                            if (a.name.isNotBlank() && a.name != a.email.substringBefore('@')) Text(a.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                },
+                                onClick = { accountId = a.id; pickAccount = false },
+                            )
+                        }
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            }
             RecipientField("Komu", to, { to = it }, contacts, names, trailing = {
                 IconButton(onClick = { showCc = !showCc }) {
                     Icon(if (showCc) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = "Kópia a skrytá kópia")
