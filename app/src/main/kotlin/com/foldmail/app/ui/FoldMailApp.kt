@@ -238,6 +238,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 ui, selectedKey = if (expanded) openKey else null, onOpen = ::openChat,
                 actions = rowActions,
                 onView = vm::setView,
+                onRefresh = vm::refresh,
                 onOpenDrawer = { scope.launch { drawerState.open() } },
                 modifier = mod,
                 heading = if (tab == MainTab.Groups) "Skupiny" else null,
@@ -255,6 +256,8 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         initialSubject = composeSubject,
                         initialBody = composeBody,
                         initialAttachments = composeFiles,
+                        contacts = ui.contacts,
+                        names = ui.names,
                         onClose = { composing = false },
                         onSend = { to, subject, body, files ->
                             vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 })

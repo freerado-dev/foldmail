@@ -19,6 +19,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val settings = AppSettings.get(this)
         MailSyncWorker.schedule(this, settings.notifications.value)
+        // Android 13+ shows no notifications until the user allows them; ask once at start.
+        if (settings.notifications.value && android.os.Build.VERSION.SDK_INT >= 33 && !com.foldmail.app.data.Notifier.hasPermission(this)) {
+            registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+                .launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
         setContent {
             val dark by settings.dark.collectAsState()
             DisposableEffect(dark) {

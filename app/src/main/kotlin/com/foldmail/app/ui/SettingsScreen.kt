@@ -78,6 +78,30 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Switch(checked = notifications, onCheckedChange = { setNotifications(it) })
             }
 
+            Row(
+                Modifier.fillMaxWidth().clickable {
+                    try {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                android.net.Uri.parse("package:" + context.packageName),
+                            ),
+                        )
+                    } catch (_: Exception) {
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    }
+                }.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Povoliť prácu na pozadí")
+                    Text(
+                        "Bez toho Samsung môže kontrolu pošty pozdržať, keď je apka zatvorená. V nastaveniach batérie ju tiež nedávaj medzi „spiace aplikácie“.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             Header("Zvuk upozornenia")
             NotificationSounds.forEach { s ->
                 ChoiceRow(s.label, selected = s.key == sound) {

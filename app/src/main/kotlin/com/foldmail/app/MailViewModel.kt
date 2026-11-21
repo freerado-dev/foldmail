@@ -49,6 +49,8 @@ data class MailUiState(
     /** Pre-computed one-line previews of each conversation's last message. */
     val previews: Map<Long, String> = emptyMap(),
     val names: Map<String, String> = emptyMap(),
+    /** Everyone seen in the mailbox, most recently used first (suggestions for new mail). */
+    val contacts: List<String> = emptyList(),
     val selfAddress: String = "",
     val accounts: List<Account> = emptyList(),
     val selectedAccount: Long? = null,
@@ -135,7 +137,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             attachments = items.associate { it.email.localId to it.attachments },
             previews = visible.associate { it.last.localId to previewOf(bodies[it.last.localId].orEmpty()) },
             richIds = items.filter { it.rich }.mapTo(HashSet()) { it.email.localId },
-            names = nameDirectory(emails),
+            names = nameDirectory(allEmails),
+            contacts = contactList(allEmails, accounts.map { it.email.lowercase() }.toSet()),
             selfAddress = repo.accountAddress,
             accounts = accounts,
             selectedAccount = acc,
@@ -273,4 +276,18 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun Set<String>.toggle(k: String) = if (k in this) this - k else this + k
+}
+
+/** Addresses from all mail, newest first, without the user's own accounts. */
+private fun contactList(emails: List<EmailMessage>, own: Set<String>): List<String> {
+    val last = HashMap<String, Long>()
+    for (m in emails) {
+        for (raw in listOf(m.from) + m.to + m.cc) {
+            val a = com.foldmail.domain.model.normalizeAddress(raw)
+            if ('@' !in a || a in own) continue
+            val t = last[a]
+            if (t == null || m.sentAtMillis > t) last[a] = m.sentAtMillis
+        }
+    }
+    return last.entries.sortedByDescending { it.value }.take(3000).map { it.key }
 }

@@ -82,6 +82,7 @@ fun ConversationListPane(
     groupsOnly: Boolean = false,
     listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
     search: SearchState = remember { SearchState() },
+    onRefresh: () -> Unit = {},
 ) {
     var pinnedOpen by rememberSaveable { mutableStateOf(true) }
     var revealedKey by remember { mutableStateOf<String?>(null) }
@@ -167,6 +168,10 @@ fun ConversationListPane(
             )
         }
 
+        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = ui.syncing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize(),
+        ) {
         LazyColumn(Modifier.fillMaxSize(), state = listState) {
             if (pinned.isNotEmpty()) {
                 item(key = "hdr-pinned") {
@@ -182,6 +187,7 @@ fun ConversationListPane(
                     ConversationRow(c, ui, c.key == selectedKey, revealedKey == c.key, { revealedKey = if (it) c.key else null }, onOpen, actions, onOpenDrawer) { moreFor = c }
                 }
             }
+        }
         }
     }
 
