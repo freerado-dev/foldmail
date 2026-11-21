@@ -225,9 +225,9 @@ internal fun ConversationRow(
     val last = c.last
     val hasAttachment = ui.attachments[last.localId].orEmpty().isNotEmpty()
     val base = MaterialTheme.typography.bodyMedium
-    val titleStyle = base.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Medium)
-    val subjectStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal)
-    val previewStyle: TextStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp)
+    val titleStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Medium)
+    val subjectStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal)
+    val previewStyle: TextStyle = base.copy(fontSize = 10.sp, lineHeight = 13.sp)
 
     var askTrash by remember { mutableStateOf(false) }
     var askForever by remember { mutableStateOf(false) }
@@ -278,7 +278,7 @@ internal fun ConversationRow(
                     if (c.key in ui.flags.muted) Icon(Icons.Filled.NotificationsOff, null, Modifier.padding(start = 4.dp).size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (c.key in ui.flags.priority) Icon(Icons.Filled.PriorityHigh, null, Modifier.padding(start = 2.dp).size(12.dp), tint = Color(0xFFFF3B30))
                     Box(Modifier.weight(1f))
-                    Text(formatTimestamp(last.sentAtMillis), fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(formatTimestamp(last.sentAtMillis), fontSize = 9.sp, lineHeight = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(last.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, style = subjectStyle)
                 val preview = (if (hasAttachment) "[Prílohy] " else "") +
