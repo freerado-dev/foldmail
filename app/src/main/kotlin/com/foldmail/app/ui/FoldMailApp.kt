@@ -13,6 +13,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
@@ -366,37 +369,35 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     if (showImap) AddImapAccountDialog(onDismiss = { showImap = false }, onAdd = { vm.addImapAccount(it) })
     }
 
-/** Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */
+/** Slim Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */
 @Composable
 private fun CompactBottomBar(tab: MainTab, onTab: (MainTab) -> Unit, onCompose: () -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.background) {
-        BarItem(MainTab.Chats, tab, onTab)
-        BarItem(MainTab.Calendar, tab, onTab)
-        // Always "selected" so the accent circle is always drawn; it is an action, not a destination.
-        NavigationBarItem(
-            selected = true, onClick = onCompose,
-            icon = { Icon(Icons.Filled.Edit, contentDescription = "Nový email") },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                indicatorColor = MaterialTheme.colorScheme.primary,
-            ),
-        )
-        BarItem(MainTab.Groups, tab, onTab)
-        BarItem(MainTab.Contacts, tab, onTab)
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).navigationBarsPadding()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        Row(Modifier.fillMaxWidth().height(46.dp), verticalAlignment = Alignment.CenterVertically) {
+            BarItem(MainTab.Chats, tab, onTab)
+            BarItem(MainTab.Calendar, tab, onTab)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(width = 52.dp, height = 34.dp).clip(RoundedCornerShape(17.dp))
+                        .background(MaterialTheme.colorScheme.primary).clickable(onClick = onCompose),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.Edit, contentDescription = "Nový email", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(19.dp)) }
+            }
+            BarItem(MainTab.Groups, tab, onTab)
+            BarItem(MainTab.Contacts, tab, onTab)
+        }
     }
 }
 
 @Composable
 private fun RowScope.BarItem(t: MainTab, current: MainTab, onTab: (MainTab) -> Unit) {
-    NavigationBarItem(
-        selected = current == t, onClick = { onTab(t) },
-        icon = { Icon(t.icon, contentDescription = t.label) },
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = MaterialTheme.colorScheme.onSurface,
-            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    )
+    Box(Modifier.weight(1f).fillMaxHeight().clickable { onTab(t) }, contentAlignment = Alignment.Center) {
+        Icon(
+            t.icon, contentDescription = t.label, modifier = Modifier.size(22.dp),
+            tint = if (current == t) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /** Draggable divider between list and detail pane, with a grab handle at the bottom (as in Samsung Email). */

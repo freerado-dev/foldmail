@@ -129,7 +129,7 @@ fun ConversationListPane(
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.Email, "Účty", tint = Color.White, modifier = Modifier.size(16.dp)) }
             Column(Modifier.padding(start = 10.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Box(Modifier.weight(1f))
@@ -225,8 +225,8 @@ internal fun ConversationRow(
     val last = c.last
     val hasAttachment = ui.attachments[last.localId].orEmpty().isNotEmpty()
     val base = MaterialTheme.typography.bodyMedium
-    val titleStyle = base.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold)
-    val subjectStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal)
+    val titleStyle = base.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Medium)
+    val subjectStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal)
     val previewStyle: TextStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp)
 
     var askTrash by remember { mutableStateOf(false) }
@@ -283,7 +283,7 @@ internal fun ConversationRow(
                 Text(last.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, style = subjectStyle)
                 val preview = (if (hasAttachment) "[Prílohy] " else "") +
                     (if (last.isOutgoing) "Ty: " else "") + (ui.previews[last.localId] ?: previewOf(ui.bodies[last.localId].orEmpty()))
-                Text(preview, maxLines = 1, overflow = TextOverflow.Ellipsis, style = previewStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(preview, maxLines = 1, overflow = TextOverflow.Ellipsis, style = previewStyle, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
             }
             if (unread) {
                 Box(
