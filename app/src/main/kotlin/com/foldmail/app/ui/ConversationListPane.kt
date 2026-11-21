@@ -225,9 +225,9 @@ internal fun ConversationRow(
     val last = c.last
     val hasAttachment = ui.attachments[last.localId].orEmpty().isNotEmpty()
     val base = MaterialTheme.typography.bodyMedium
-    val titleStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Medium)
-    val subjectStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal)
-    val previewStyle: TextStyle = base.copy(fontSize = 10.sp, lineHeight = 13.sp)
+    val titleStyle = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Medium)
+    val subjectStyle = base.copy(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal)
+    val previewStyle: TextStyle = base.copy(fontSize = 10.sp, lineHeight = 14.sp)
 
     var askTrash by remember { mutableStateOf(false) }
     var askForever by remember { mutableStateOf(false) }
@@ -266,7 +266,7 @@ internal fun ConversationRow(
                 .fillMaxWidth()
                 .background(if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
                 .combinedClickable(onClick = { if (revealed) onRevealedChange(false) else onOpen(c.key) }, onLongClick = onMore)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
