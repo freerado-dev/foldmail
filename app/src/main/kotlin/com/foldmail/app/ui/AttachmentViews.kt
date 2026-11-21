@@ -174,6 +174,42 @@ fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long =
     }
 }
 
+/** Compact attachment line with a small thumbnail, used in search results. */
+@Composable
+fun AttachmentRow(a: Attachment, localId: Long, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val fetcher = LocalAttachmentFetcher.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var local by remember(a) { mutableStateOf(if (a.uri != null) a else null) }
+    androidx.compose.runtime.LaunchedEffect(a) {
+        if (local == null && a.remoteId != null && (a.isImage || a.isPdf) && (a.sizeBytes ?: 0L) < 8_000_000L) {
+            local = try { fetcher(localId, a) } catch (_: Exception) { null }
+        }
+    }
+    val shown = local ?: a
+    val hasThumb = shown.uri != null && (shown.isImage || shown.isPdf)
+    Row(
+        modifier.fillMaxWidth().clickable {
+            scope.launch {
+                val r = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }
+                if (r != null) { local = r; openAttachment(context, r) }
+                else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }.padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+            if (hasThumb) Thumbnail(shown, Modifier.fillMaxSize()) else Icon(iconFor(a), null, Modifier.size(26.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+            val kind = when { a.isImage -> "Obrázok"; a.isPdf -> "PDF"; a.isVideo -> "Video"; else -> "Súbor" }
+            val size = formatSize(shown.sizeBytes ?: a.sizeBytes)
+            Text(if (size.isEmpty()) kind else "$kind · $size", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 /** Copies the file into the public Downloads folder. */
 private suspend fun saveToDownloads(context: Context, a: Attachment): Boolean = withContext(Dispatchers.IO) {
     try {

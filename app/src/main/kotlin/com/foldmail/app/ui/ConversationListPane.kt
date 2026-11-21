@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +80,7 @@ fun ConversationListPane(
     heading: String? = null,
     groupsOnly: Boolean = false,
     listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    search: SearchState = remember { SearchState() },
 ) {
     var pinnedOpen by rememberSaveable { mutableStateOf(true) }
     var revealedKey by remember { mutableStateOf<String?>(null) }
@@ -106,7 +109,7 @@ fun ConversationListPane(
     }
     val subtitle = account?.email ?: "Účtov: ${ui.accountCount}"
 
-    Column(modifier.safeTop()) {
+    if (search.open) SearchPane(ui, search, actions, onOpen, modifier) else Column(modifier.safeTop()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(30.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable(onClick = onOpenDrawer),
@@ -116,6 +119,8 @@ fun ConversationListPane(
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Box(Modifier.weight(1f))
+            IconButton(onClick = { search.open = true }) { Icon(Icons.Filled.Search, contentDescription = "Hľadať") }
         }
         Row(Modifier.fillMaxWidth()) {
             Tab.entries.forEach { t ->
@@ -183,7 +188,7 @@ private fun SectionHeader(text: String, expandable: Boolean = false, open: Boole
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(
+internal fun ConversationRow(
     c: PersonConversation,
     ui: MailUiState,
     selected: Boolean,

@@ -106,6 +106,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeAccount by rememberSaveable { mutableStateOf(-1L) }
     var composeFiles by remember { mutableStateOf(emptyList<Attachment>()) }
     var draftVersion by rememberSaveable { mutableStateOf(0) }
+    val search = remember { SearchState() }
     val chatsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val groupsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     var showImap by rememberSaveable { mutableStateOf(false) }
@@ -224,6 +225,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 heading = if (tab == MainTab.Groups) "Skupiny" else null,
                 groupsOnly = tab == MainTab.Groups,
                 listState = if (tab == MainTab.Groups) groupsListState else chatsListState,
+                search = search,
             )
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->
