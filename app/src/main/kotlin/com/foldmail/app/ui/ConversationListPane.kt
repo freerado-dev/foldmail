@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -202,6 +203,15 @@ private fun ConversationRow(
     val subjectStyle = base.copy(fontSize = 12.sp, lineHeight = 15.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal)
     val previewStyle: TextStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp)
 
+    var askTrash by remember { mutableStateOf(false) }
+    if (askTrash) {
+        TrashChoiceDialog(
+            count = c.messages.size,
+            onLast = { askTrash = false; onRevealedChange(false); actions.trashMessage(c.last.localId) },
+            onAll = { askTrash = false; onRevealedChange(false); actions.moveTo(c.key, Folder.Trash) },
+            onDismiss = { askTrash = false; onRevealedChange(false) },
+        )
+    }
     SwipeRevealRow(
         revealed = revealed,
         onRevealedChange = onRevealedChange,
@@ -210,7 +220,7 @@ private fun ConversationRow(
         actions = {
             SwipeActionButtons(
                 onMore = onMore,
-                onTrash = { actions.moveTo(c.key, Folder.Trash) },
+                onTrash = { if (c.messages.size > 1) askTrash = true else actions.moveTo(c.key, Folder.Trash) },
                 onArchive = { actions.moveTo(c.key, Folder.Archive) },
             )
         },
@@ -244,6 +254,32 @@ private fun ConversationRow(
                     Modifier.padding(top = 2.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
                         .padding(horizontal = 6.dp, vertical = 1.dp),
                 ) { Text(c.unreadCount.toString(), color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, lineHeight = 12.sp) }
+            }
+        }
+    }
+}
+
+/** Asks what to delete when a chat holds more than one message. */
+@Composable
+private fun TrashChoiceDialog(count: Int, onLast: () -> Unit, onAll: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.background) {
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onLast).padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Delete, null, Modifier.size(24.dp))
+                    Text("Vymazať poslednú správu", Modifier.padding(start = 16.dp))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onAll).padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Delete, null, Modifier.size(24.dp), tint = Color(0xFFE53935))
+                    Text("Vymazať všetky správy ($count)", Modifier.padding(start = 16.dp), color = Color(0xFFE53935))
+                }
             }
         }
     }

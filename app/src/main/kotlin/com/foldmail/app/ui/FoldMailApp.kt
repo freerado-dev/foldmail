@@ -120,7 +120,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     val rowActions = RowActions(
         togglePin = vm::togglePin, toggleStar = vm::toggleStar, toggleMute = vm::toggleMute,
         togglePriority = vm::togglePriority, toggleAutoArchive = vm::toggleAutoArchive,
-        block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo,
+        block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo, trashMessage = vm::deleteMessage,
     )
     val context = LocalContext.current
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
