@@ -99,6 +99,7 @@ class RowActions(
     val snooze: (String, Long) -> Unit,
     val moveTo: (String, Folder) -> Unit,
     val trashMessage: (Long) -> Unit = {},
+    val emptyTrash: () -> Unit = {},
 )
 
 // --------------------------------------------------------------------------------------------

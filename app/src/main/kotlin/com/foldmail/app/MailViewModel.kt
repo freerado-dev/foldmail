@@ -18,7 +18,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 /** Which set of chats the list shows. */
-enum class ListView { All, Notes, Starred, Archived }
+enum class ListView { All, Notes, Starred, Archived, Trash }
+
+/** Offered for 5 seconds after archiving or trashing. */
+data class UndoInfo(val id: Long, val text: String)
 
 /** Per-conversation user state, keyed by conversation key. */
 data class Flags(
@@ -31,6 +34,8 @@ data class Flags(
     /** conversation key -> time it was archived; new mail after that brings the chat back. */
     val archived: Map<String, Long> = emptyMap(),
     val snoozed: Map<String, Long> = emptyMap(),
+    /** Messages in the trash (still on the server until deleted from the trash). */
+    val trashed: Set<Long> = emptySet(),
 )
 
 /** Immutable snapshot the UI renders. */
@@ -53,6 +58,7 @@ data class MailUiState(
     val syncing: Boolean = false,
     val syncError: String? = null,
     val message: String? = null,
+    val undo: UndoInfo? = null,
 ) {
     val accountCount: Int get() = accounts.size
     val pinned: Set<String> get() = flags.pinned
@@ -67,11 +73,31 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val repo: MailRepository = AppMailRepository(app)
     private val clock: () -> Long = System::currentTimeMillis
 
-    private val flags = MutableStateFlow(Flags())
+    private val prefs = app.getSharedPreferences("foldmail_flags", android.content.Context.MODE_PRIVATE)
+    private val flags = MutableStateFlow(
+        Flags(
+            trashed = prefs.getStringSet("trashed", emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
+            archived = prefs.getStringSet("archived", emptySet()).orEmpty().mapNotNull {
+                val i = it.lastIndexOf('|'); if (i < 0) null else it.substring(0, i) to (it.substring(i + 1).toLongOrNull() ?: return@mapNotNull null)
+            }.toMap(),
+        ),
+    )
+    private var undoAction: (() -> Unit)? = null
+    private val undoInfo = MutableStateFlow<UndoInfo?>(null)
+    private var undoCounter = 0L
     private val viewState = MutableStateFlow(ViewState())
     private val message = MutableStateFlow<String?>(null)
 
     init {
+        // Keep trash and archive across restarts.
+        viewModelScope.launch {
+            flags.collect { f ->
+                prefs.edit()
+                    .putStringSet("trashed", f.trashed.mapTo(HashSet()) { it.toString() })
+                    .putStringSet("archived", f.archived.entries.mapTo(HashSet()) { "${it.key}|${it.value}" })
+                    .apply()
+            }
+        }
         // Pull new mail once a minute while the app is alive (no-op without a real account).
         viewModelScope.launch {
             while (true) {
@@ -81,13 +107,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private val statusAndMessage = combine(repo.status, message) { s, m -> s to m }
+    private val statusAndMessage = combine(repo.status, message, undoInfo) { s, m, u -> Triple(s, m, u) }
 
     val state: StateFlow<MailUiState> = combine(repo.items, flags, viewState, repo.accounts, statusAndMessage) { items, f, vs, accounts, sm ->
         val acc = vs.account
         val view = vs.view
-        val emails: List<EmailMessage> = items.map { it.email }
-        val scoped = if (acc == null) emails else emails.filter { it.accountId == acc }
+        val allEmails: List<EmailMessage> = items.map { it.email }
+        val inTrash = view == ListView.Trash
+        val emails: List<EmailMessage> = allEmails.filter { it.localId !in f.trashed }
+        val pool = if (inTrash) allEmails.filter { it.localId in f.trashed } else emails
+        val scoped = if (acc == null) pool else pool.filter { it.accountId == acc }
         // Keys stay person-based in every account view so flags survive switching accounts.
         val all = PersonConversations.build(scoped, mergeAccounts = true)
         val now = clock()
@@ -95,7 +124,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val k = c.key
             val archivedAt = f.archived[k]
             val isArchived = archivedAt != null && c.last.sentAtMillis <= archivedAt
-            if (view == ListView.Archived) isArchived
+            if (inTrash) true
+            else if (view == ListView.Archived) isArchived
             else !isArchived && k !in f.blocked && (f.snoozed[k] ?: 0L) <= now
         }
         val bodies = items.associate { it.email.localId to it.body }
@@ -116,6 +146,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             syncError = sm.first.error,
             syncProgress = sm.first.progress,
             message = sm.second,
+            undo = sm.third,
         )
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
@@ -173,23 +204,73 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun block(key: String) = flags.update { it.copy(blocked = it.blocked + key) }
     fun snooze(key: String, untilMillis: Long) = flags.update { it.copy(snoozed = it.snoozed + (key to untilMillis)) }
 
-    fun moveTo(key: String, folder: Folder) {
-        if (folder == Folder.Trash) {
-            // Really delete: removes the messages here and in Gmail.
-            val ids = state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
+    private fun offerUndo(text: String, action: () -> Unit) {
+        undoAction = action
+        undoInfo.value = UndoInfo(++undoCounter, text)
+    }
+
+    fun undo() {
+        val a = undoAction
+        undoAction = null
+        undoInfo.value = null
+        a?.invoke()
+    }
+
+    fun dismissUndo(id: Long) {
+        if (undoInfo.value?.id == id) { undoInfo.value = null; undoAction = null }
+    }
+
+    private fun idsOf(key: String): List<Long> =
+        state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
+
+    /** Moves to the trash (undoable); from inside the trash it deletes for real. */
+    private fun trash(ids: List<Long>, text: String) {
+        if (ids.isEmpty()) return
+        if (viewState.value.view == ListView.Trash) {
             repo.moveMessages(ids, Folder.Trash)
-        } else {
-            val ids = state.value.conversations.firstOrNull { it.key == key }?.messages?.map { it.localId }.orEmpty()
-            repo.moveMessages(ids, folder)
-            flags.update {
-                val archived = if (folder == Folder.Archive) it.archived + (key to clock()) else it.archived - key
-                it.copy(archived = archived, snoozed = it.snoozed - key)
+            flags.update { it.copy(trashed = it.trashed - ids.toSet()) }
+            return
+        }
+        flags.update { it.copy(trashed = it.trashed + ids) }
+        offerUndo(text) { flags.update { it.copy(trashed = it.trashed - ids.toSet()) } }
+    }
+
+    fun moveTo(key: String, folder: Folder) {
+        val ids = idsOf(key)
+        if (ids.isEmpty()) return
+        when (folder) {
+            Folder.Trash -> trash(ids, "Presunuté do koša")
+            Folder.Archive -> {
+                val before = flags.value
+                repo.moveMessages(ids, Folder.Archive)
+                flags.update { it.copy(archived = it.archived + (key to clock()), snoozed = it.snoozed - key, trashed = it.trashed - ids.toSet()) }
+                offerUndo("Archivované") {
+                    repo.moveMessages(ids, Folder.Inbox)
+                    flags.update {
+                        it.copy(
+                            archived = before.archived[key]?.let { t -> it.archived + (key to t) } ?: (it.archived - key),
+                            trashed = it.trashed + ids.filter { id -> id in before.trashed },
+                        )
+                    }
+                }
+            }
+            Folder.Inbox -> {
+                repo.moveMessages(ids, Folder.Inbox)
+                flags.update { it.copy(archived = it.archived - key, snoozed = it.snoozed - key, trashed = it.trashed - ids.toSet()) }
             }
         }
     }
 
-    /** Deletes one message (here and in Gmail). */
-    fun deleteMessage(localId: Long) = repo.moveMessages(listOf(localId), Folder.Trash)
+    /** Deletes one message: to the trash, or for real when already in the trash. */
+    fun deleteMessage(localId: Long) = trash(listOf(localId), "Správa presunutá do koša")
+
+    /** Deletes everything shown in the trash for real. */
+    fun emptyTrash() {
+        val ids = state.value.conversations.flatMap { c -> c.messages.map { it.localId } }
+        if (ids.isEmpty()) return
+        repo.moveMessages(ids, Folder.Trash)
+        flags.update { it.copy(trashed = it.trashed - ids.toSet()) }
+    }
 
     private fun Set<String>.toggle(k: String) = if (k in this) this - k else this + k
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Inbox
@@ -85,6 +86,16 @@ fun ConversationListPane(
     var pinnedOpen by rememberSaveable { mutableStateOf(true) }
     var revealedKey by remember { mutableStateOf<String?>(null) }
     var moreFor by remember { mutableStateOf<PersonConversation?>(null) }
+    var confirmEmpty by remember { mutableStateOf(false) }
+    if (confirmEmpty) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmEmpty = false },
+            title = { Text("Vyprázdniť kôš?") },
+            text = { Text("Všetky správy v koši sa natrvalo vymažú.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmEmpty = false; actions.emptyTrash() }) { Text("Vymazať", color = Color(0xFFE53935)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmEmpty = false }) { Text("Zrušiť") } },
+        )
+    }
 
     val view = ui.view
     val visible = remember(ui, view, groupsOnly) {
@@ -98,12 +109,13 @@ fun ConversationListPane(
                 }
             }
     }
-    val pinned = if (view == ListView.Archived) emptyList() else visible.filter { it.key in ui.pinned }
+    val pinned = if (view == ListView.Archived || view == ListView.Trash) emptyList() else visible.filter { it.key in ui.pinned }
     val sections = remember(visible, pinned) { visible.filter { it !in pinned }.groupBy { sectionOf(it.last.sentAtMillis) } }
 
     val account = ui.accounts.firstOrNull { it.id == ui.selectedAccount }
     val title = heading ?: when {
         view == ListView.Archived -> "Archív"
+        view == ListView.Trash -> "Kôš"
         account != null -> account.name
         else -> "Zjednotené"
     }
@@ -120,6 +132,9 @@ fun ConversationListPane(
                 Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Box(Modifier.weight(1f))
+            if (view == ListView.Trash && visible.isNotEmpty()) {
+                IconButton(onClick = { confirmEmpty = true }) { Icon(Icons.Filled.DeleteSweep, contentDescription = "Vyprázdniť kôš") }
+            }
             IconButton(onClick = { search.open = true }) { Icon(Icons.Filled.Search, contentDescription = "Hľadať") }
         }
         Row(Modifier.fillMaxWidth()) {
@@ -209,6 +224,16 @@ internal fun ConversationRow(
     val previewStyle: TextStyle = base.copy(fontSize = 11.sp, lineHeight = 14.sp)
 
     var askTrash by remember { mutableStateOf(false) }
+    var askForever by remember { mutableStateOf(false) }
+    if (askForever) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { askForever = false; onRevealedChange(false) },
+            title = { Text("Vymazať natrvalo?") },
+            text = { Text("Správy sa nedajú vrátiť späť.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { askForever = false; onRevealedChange(false); actions.moveTo(c.key, Folder.Trash) }) { Text("Vymazať", color = Color(0xFFE53935)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { askForever = false; onRevealedChange(false) }) { Text("Zrušiť") } },
+        )
+    }
     if (askTrash) {
         TrashChoiceDialog(
             count = c.messages.size,
@@ -225,7 +250,7 @@ internal fun ConversationRow(
         actions = {
             SwipeActionButtons(
                 onMore = onMore,
-                onTrash = { if (c.messages.size > 1) askTrash = true else actions.moveTo(c.key, Folder.Trash) },
+                onTrash = { if (ui.view == ListView.Trash) askForever = true else if (c.messages.size > 1) askTrash = true else actions.moveTo(c.key, Folder.Trash) },
                 onArchive = { actions.moveTo(c.key, Folder.Archive) },
             )
         },

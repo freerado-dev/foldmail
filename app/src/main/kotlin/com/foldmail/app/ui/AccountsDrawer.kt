@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
@@ -94,6 +95,7 @@ fun AccountsDrawer(
                 DrawerItem(Icons.Filled.StickyNote2, "Poznámky") { onView(ListView.Notes) }
                 DrawerItem(Icons.Filled.CheckBox, "Úlohy", soon = true) { soon() }
                 DrawerItem(Icons.Filled.Archive, "Archív") { onView(ListView.Archived) }
+                DrawerItem(Icons.Filled.Delete, "Kôš") { onView(ListView.Trash) }
                 DrawerItem(Icons.Filled.Schedule, "Naplánované", soon = true) { soon() }
                 DrawerItem(Icons.Filled.Edit, "Koncepty", soon = true) { soon() }
                 DrawerItem(if (showFolders) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, if (showFolders) "Skryť priečinky" else "Zobraziť priečinky") {

@@ -121,7 +121,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     val rowActions = RowActions(
         togglePin = vm::togglePin, toggleStar = vm::toggleStar, toggleMute = vm::toggleMute,
         togglePriority = vm::togglePriority, toggleAutoArchive = vm::toggleAutoArchive,
-        block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo, trashMessage = vm::deleteMessage,
+        block = vm::block, snooze = vm::snooze, moveTo = vm::moveTo, trashMessage = vm::deleteMessage, emptyTrash = vm::emptyTrash,
     )
     val context = LocalContext.current
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -318,6 +318,21 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     tab.isChatList -> listPane(mod)
                     tab == MainTab.Contacts -> contacts(mod)
                     else -> calendar(mod)
+                }
+            }
+        }
+        ui.undo?.let { u ->
+            androidx.compose.runtime.LaunchedEffect(u.id) { kotlinx.coroutines.delay(5000); vm.dismissUndo(u.id) }
+            androidx.compose.material3.Surface(
+                color = androidx.compose.ui.graphics.Color(0xFF323232),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 84.dp),
+            ) {
+                Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(u.text, color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(vertical = 10.dp))
+                    androidx.compose.material3.TextButton(onClick = { vm.undo() }) {
+                        Text("SPÄŤ", color = androidx.compose.ui.graphics.Color(0xFF8AB4F8))
+                    }
                 }
             }
         }
