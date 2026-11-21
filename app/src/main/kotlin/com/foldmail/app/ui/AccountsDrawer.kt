@@ -57,6 +57,7 @@ fun AccountsDrawer(
     onView: (ListView) -> Unit,
     onAddAccount: () -> Unit,
     onSync: () -> Unit,
+    onOpenSettings: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
@@ -66,7 +67,7 @@ fun AccountsDrawer(
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("FoldMail", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                IconButton(onClick = { soon() }) { Icon(Icons.Filled.Settings, contentDescription = "Nastavenia") }
+                IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, contentDescription = "Nastavenia") }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 

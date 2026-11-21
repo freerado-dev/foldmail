@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -65,7 +66,7 @@ fun ChatPane(
     ui: MailUiState,
     onBack: (() -> Unit)?,
     onOpened: () -> Unit,
-    onReply: (String, List<Attachment>) -> Unit,
+    onReply: (String, List<Attachment>, String?) -> Unit,
     onAction: (MessageAction, EmailMessage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -141,7 +142,7 @@ fun ChatPane(
             if (target != null) onAction(a, target)
             if (a == MessageAction.Delete) selectedId = null
         })
-        ReplyBar(title, onSend = onReply)
+        ReplyBar(conversation.key, title, conversation.last.subject, onSend = onReply)
     }
 }
 
@@ -217,27 +218,59 @@ private fun Bubble(localId: Long, subject: String?, body: String, attachments: L
 }
 
 @Composable
-private fun ReplyBar(title: String, onSend: (String, List<Attachment>) -> Unit) {
-    var text by rememberSaveable { mutableStateOf("") }
-    val pending = remember { mutableStateListOf<Attachment>() }
+private fun ReplyBar(key: String, title: String, replySubject: String, onSend: (String, List<Attachment>, String?) -> Unit) {
+    var text by rememberSaveable(key) { mutableStateOf("") }
+    var replying by rememberSaveable(key) { mutableStateOf(true) }
+    var newSubject by rememberSaveable(key) { mutableStateOf("") }
+    val pending = remember(key) { mutableStateListOf<Attachment>() }
     val actions = rememberAttachmentActions { pending.addAll(it) }
     val canSend = text.isNotBlank() || pending.isNotEmpty()
 
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        // Subject strip: shows what we reply to; the cross turns it into a new email with its own subject.
+        Row(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (replying) {
+                Text(replySubject, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                IconButton(onClick = { replying = false }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Close, contentDescription = "Zrušiť odpoveď", Modifier.size(18.dp))
+                }
+            } else {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = newSubject, onValueChange = { newSubject = it },
+                    modifier = Modifier.weight(1f).padding(vertical = 6.dp), singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { inner ->
+                        if (newSubject.isEmpty()) Text("Bez predmetu – napíš predmet", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        inner()
+                    },
+                )
+                IconButton(onClick = { replying = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = "Vrátiť odpoveď", Modifier.size(18.dp))
+                }
+            }
+        }
         PendingAttachments(pending, onRemove = { pending.remove(it) })
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             AttachMenuButton(actions)
             OutlinedTextField(
                 value = text, onValueChange = { text = it },
                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                placeholder = { Text("Odpovedať: $title", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                placeholder = { Text((if (replying) "Odpovedať: " else "Napísať: ") + title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 shape = MaterialTheme.shapes.large,
                 maxLines = 5,
             )
             FilledIconButton(
                 enabled = canSend,
-                onClick = { onSend(text.trim(), pending.toList()); text = ""; pending.clear() },
+                onClick = {
+                    onSend(text.trim(), pending.toList(), if (replying) null else newSubject.trim())
+                    text = ""; pending.clear()
+                    if (!replying) { newSubject = ""; replying = true }
+                },
                 modifier = Modifier.padding(end = 8.dp),
             ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Odoslať") }
         }

@@ -26,7 +26,7 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /** Real Gmail accounts: persists the account list, downloads inbox + sent mail, sends and marks read. */
-class GmailRepository(private val context: Context) {
+class GmailRepository private constructor(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = context.getSharedPreferences("gmail_accounts", Context.MODE_PRIVATE)
     private val syncMutex = Mutex()
@@ -43,13 +43,20 @@ class GmailRepository(private val context: Context) {
     private val threadByMessageId = ConcurrentHashMap<String, String>()
 
     private val store = MailStore(context)
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
         // Show the mail saved on the device immediately, then fetch only what is new.
-        if (accounts.value.isNotEmpty()) scope.launch {
+        if (accounts.value.isNotEmpty()) loadJob = scope.launch {
             loadFromDisk()
             sync()
         }
+    }
+
+    /** Waits for the start-up load and runs a full sync (used by the background worker). */
+    suspend fun syncNow() {
+        loadJob?.join()
+        syncMutex.withLock { runSync() }
     }
 
     private suspend fun loadFromDisk() {
@@ -104,6 +111,14 @@ class GmailRepository(private val context: Context) {
     private suspend fun sync() {
         if (!syncMutex.tryLock()) return
         try {
+            runSync()
+        } finally {
+            syncMutex.unlock()
+        }
+    }
+
+    private suspend fun runSync() {
+        run {
             status.value = SyncStatus(syncing = true)
             val all = ArrayList<MailItem>()
             val errors = ArrayList<String>()
@@ -116,8 +131,6 @@ class GmailRepository(private val context: Context) {
             }
             if (errors.isEmpty() || all.isNotEmpty()) items.value = all
             status.value = SyncStatus(false, errors.firstOrNull())
-        } finally {
-            syncMutex.unlock()
         }
     }
 
@@ -128,7 +141,9 @@ class GmailRepository(private val context: Context) {
                 GmailApi.listIdsQuery(token, "-in:inbox -in:sent -in:trash -in:spam -in:drafts", ARCHIVE_COUNT)
             ).distinct()
         // Download only what is new (plus the newest few, to pick up read/unread changes).
-        val toFetch = (ids.filter { !cache.containsKey("${account.id}:$it") } + ids.take(REFRESH_NEWEST)).distinct()
+        val hadCache = cache.keys.any { it.startsWith("${account.id}:") }
+        val fresh = ids.filter { !cache.containsKey("${account.id}:$it") }
+        val toFetch = (fresh + ids.take(REFRESH_NEWEST)).distinct()
         val gate = Semaphore(4)
         var failure: Exception? = null
         coroutineScope {
@@ -147,6 +162,19 @@ class GmailRepository(private val context: Context) {
                     }
                 }
             }.awaitAll()
+        }
+        // Announce unread incoming mail that appeared since the last sync (not on the very first download).
+        if (hadCache) {
+            val recent = System.currentTimeMillis() - 3L * 24 * 3600 * 1000
+            val news = fresh.mapNotNull { cache["${account.id}:$it"] }
+                .filter { !it.email.isOutgoing && !it.email.isRead && it.email.sentAtMillis > recent }
+                .sortedBy { it.email.sentAtMillis }
+                .map {
+                    val from = it.email.from
+                    val name = from.substringBefore('<').trim().trim('"').ifEmpty { normalizeAddress(from) }
+                    NewMail(it.email.localId, name, it.email.subject, com.foldmail.app.previewOf(it.body))
+                }
+            Notifier.notifyNew(context, news)
         }
         // Forget messages that disappeared on the server (deleted elsewhere).
         val keep = ids.map { "${account.id}:$it" }.toSet()
@@ -318,6 +346,10 @@ class GmailRepository(private val context: Context) {
     }
 
     companion object {
+        @Volatile private var instance: GmailRepository? = null
+        fun get(context: Context): GmailRepository =
+            instance ?: synchronized(this) { instance ?: GmailRepository(context.applicationContext).also { instance = it } }
+
         private const val INBOX_COUNT = 200
         private const val SENT_COUNT = 100
         private const val ARCHIVE_COUNT = 50

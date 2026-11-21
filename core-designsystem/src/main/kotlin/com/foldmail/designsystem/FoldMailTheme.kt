@@ -32,9 +32,17 @@ private val Light = lightColorScheme(
 
 private val Dark = darkColorScheme(
     primary = Color(0xFF2997FF),
-    background = Color(0xFF000000),
-    surface = Color(0xFF000000),
-    surfaceVariant = Color(0xFF1C1C1E),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF16406E),
+    onPrimaryContainer = Color(0xFFE6F0FF),
+    background = Color(0xFF111113),
+    onBackground = Color(0xFFF2F2F7),
+    surface = Color(0xFF111113),
+    onSurface = Color(0xFFF2F2F7),
+    surfaceVariant = Color(0xFF2A2A2D),
+    onSurfaceVariant = Color(0xFFAEAEB2),
+    surfaceContainer = Color(0xFF1C1C1E),
+    outline = Color(0xFF48484A),
 )
 
 private val FoldShapes = Shapes(

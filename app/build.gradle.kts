@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coroutines.core)
     implementation(libs.play.services.auth)
+    implementation(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)

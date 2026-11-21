@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.stateIn
 /** Shows the demo mailbox until the first real Google account is added, then only real mail. */
 class AppMailRepository(context: Context) : MailRepository {
     private val demo = InMemoryMailRepository()
-    private val gmail = GmailRepository(context.applicationContext)
+    private val gmail = GmailRepository.get(context.applicationContext)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val real get() = gmail.accounts.value.isNotEmpty()
