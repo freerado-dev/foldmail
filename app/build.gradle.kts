@@ -40,6 +40,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    packaging {
+        resources {
+            excludes += listOf("META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES", "META-INF/*.md")
+            pickFirsts += listOf("META-INF/mailcap", "META-INF/mimetypes.default", "META-INF/javamail.*", "META-INF/mailcap.default")
+        }
+    }
     buildFeatures { compose = true }
 }
 
@@ -62,6 +68,8 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.play.services.auth)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)

@@ -41,6 +41,19 @@ object Notifier {
         return id
     }
 
+    /** Announces unread incoming mail from the last three days. */
+    fun announce(context: Context, fresh: List<com.foldmail.app.MailItem>) {
+        val recent = System.currentTimeMillis() - 3L * 24 * 3600 * 1000
+        val news = fresh.filter { !it.email.isOutgoing && !it.email.isRead && it.email.sentAtMillis > recent }
+            .sortedBy { it.email.sentAtMillis }
+            .map {
+                val from = it.email.from
+                val name = from.substringBefore('<').trim().trim('"').ifEmpty { com.foldmail.domain.model.normalizeAddress(from) }
+                NewMail(it.email.localId, name, it.email.subject, com.foldmail.app.previewOf(it.body))
+            }
+        notifyNew(context, news)
+    }
+
     fun hasPermission(context: Context): Boolean =
         Build.VERSION.SDK_INT < 33 ||
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED

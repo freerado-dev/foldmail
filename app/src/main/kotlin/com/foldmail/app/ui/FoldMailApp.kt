@@ -108,6 +108,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var draftVersion by rememberSaveable { mutableStateOf(0) }
     val chatsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val groupsListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var showImap by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var viewingId by rememberSaveable { mutableStateOf<Long?>(null) }
 
@@ -202,6 +203,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 onView = { vm.setView(it); showList() },
                 onAddAccount = { scope.launch { drawerState.close() }; addAccount() },
                 onSync = { vm.refresh(); scope.launch { drawerState.close() } },
+                onAddImap = { showImap = true; scope.launch { drawerState.close() } },
                 onOpenSettings = { showSettings = true; composing = false; tab = MainTab.Chats; scope.launch { drawerState.close() } },
             )
         },
@@ -320,6 +322,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     }
 }
     }
+    if (showImap) AddImapAccountDialog(onDismiss = { showImap = false }, onAdd = { vm.addImapAccount(it) })
     }
 
 /** Spike-like bar, icons only: Chats · Calendar · [New email, accent] · Groups · Contacts. */

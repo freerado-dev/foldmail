@@ -11,6 +11,7 @@ coreKtx = "1.16.0"
 activityCompose = "1.10.1"
 lifecycle = "2.8.7"
 work = "2.10.0"
+androidMail = "1.6.7"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -28,6 +29,8 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 org-json = { module = "org.json:json", version = "20240303" }
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+android-mail = { module = "com.sun.mail:android-mail", version.ref = "androidMail" }
+android-activation = { module = "com.sun.mail:android-activation", version.ref = "androidMail" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 
 [plugins]

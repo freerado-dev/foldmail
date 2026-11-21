@@ -142,6 +142,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Throws with a readable message when the login does not work. */
+    suspend fun addImapAccount(config: ImapConfig) {
+        repo.addImapAccount(config)
+        message.value = "Účet pridaný, sťahujem poštu…"
+    }
+
     fun reportMessage(text: String) { message.value = text }
     fun consumeMessage() { message.value = null }
 

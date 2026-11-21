@@ -13,9 +13,10 @@ import java.util.concurrent.TimeUnit
 /** Checks Gmail in the background (about every 15 minutes) so new mail can be announced. */
 class MailSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val repo = GmailRepository.get(applicationContext)
-        if (repo.accounts.value.isEmpty()) return Result.success()
-        try { repo.syncNow() } catch (_: Exception) { /* next run tries again */ }
+        val gmail = GmailRepository.get(applicationContext)
+        val imap = ImapRepository.get(applicationContext)
+        if (gmail.accounts.value.isNotEmpty()) try { gmail.syncNow() } catch (_: Exception) { /* next run tries again */ }
+        if (imap.accounts.value.isNotEmpty()) try { imap.syncNow() } catch (_: Exception) { }
         return Result.success()
     }
 

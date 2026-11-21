@@ -58,6 +58,7 @@ fun AccountsDrawer(
     onAddAccount: () -> Unit,
     onSync: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onAddImap: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
@@ -121,6 +122,7 @@ fun AccountsDrawer(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
             DrawerItem(Icons.Filled.Add, "Pridať Google účet", onClick = onAddAccount)
+            DrawerItem(Icons.Filled.Add, "Pridať IMAP / POP účet", onClick = onAddImap)
             DrawerItem(Icons.Filled.Sync, "Synchronizovať", onClick = onSync)
         }
     }

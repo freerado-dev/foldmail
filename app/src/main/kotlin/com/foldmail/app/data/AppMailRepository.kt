@@ -3,6 +3,7 @@ package com.foldmail.app.data
 import android.content.Context
 import com.foldmail.app.Account
 import com.foldmail.app.Attachment
+import com.foldmail.app.ImapConfig
 import com.foldmail.app.InMemoryMailRepository
 import com.foldmail.app.MailItem
 import com.foldmail.app.MailRepository
@@ -15,49 +16,66 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-/** Shows the demo mailbox until the first real Google account is added, then only real mail. */
+/** Shows the demo mailbox until the first real account is added, then only real mail (Gmail + IMAP/POP). */
 class AppMailRepository(context: Context) : MailRepository {
     private val demo = InMemoryMailRepository()
     private val gmail = GmailRepository.get(context.applicationContext)
+    private val imap = ImapRepository.get(context.applicationContext)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val real get() = gmail.accounts.value.isNotEmpty()
+    private val real get() = gmail.accounts.value.isNotEmpty() || imap.accounts.value.isNotEmpty()
 
-    override val items: StateFlow<List<MailItem>> = combine(gmail.accounts, gmail.items, demo.items) { g, gi, di ->
-        if (g.isEmpty()) di else gi
-    }.stateIn(scope, SharingStarted.Eagerly, if (gmail.accounts.value.isEmpty()) demo.items.value else gmail.items.value)
+    override val items: StateFlow<List<MailItem>> =
+        combine(gmail.accounts, imap.accounts, gmail.items, imap.items, demo.items) { g, i, gi, ii, di ->
+            if (g.isEmpty() && i.isEmpty()) di else if (ii.isEmpty()) gi else if (gi.isEmpty()) ii else gi + ii
+        }.stateIn(scope, SharingStarted.Eagerly, if (!real) demo.items.value else gmail.items.value + imap.items.value)
 
-    override val accounts: StateFlow<List<Account>> = combine(gmail.accounts, demo.accounts) { g, d ->
-        if (g.isEmpty()) d else g
-    }.stateIn(scope, SharingStarted.Eagerly, if (gmail.accounts.value.isEmpty()) demo.accounts.value else gmail.accounts.value)
+    override val accounts: StateFlow<List<Account>> =
+        combine(gmail.accounts, imap.accounts, demo.accounts) { g, i, d -> if (g.isEmpty() && i.isEmpty()) d else g + i }
+            .stateIn(scope, SharingStarted.Eagerly, if (!real) demo.accounts.value else gmail.accounts.value + imap.accounts.value)
 
-    override val status: StateFlow<SyncStatus> = gmail.status
+    override val status: StateFlow<SyncStatus> = combine(gmail.status, imap.status) { a, b ->
+        SyncStatus(a.syncing || b.syncing, a.error ?: b.error, a.progress ?: b.progress)
+    }.stateIn(scope, SharingStarted.Eagerly, SyncStatus())
 
-    override val accountAddress: String get() = gmail.accounts.value.firstOrNull()?.email ?: demo.accountAddress
+    override val accountAddress: String
+        get() = gmail.accounts.value.firstOrNull()?.email ?: imap.accounts.value.firstOrNull()?.email ?: demo.accountAddress
+
+    private fun isImap(accountId: Long) = imap.accounts.value.any { it.id == accountId }
 
     override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
-        if (real) gmail.send(to, subject, body, inReplyTo, attachments, accountId)
-        else demo.send(to, subject, body, inReplyTo, attachments, accountId)
+        when {
+            !real -> demo.send(to, subject, body, inReplyTo, attachments, accountId)
+            isImap(accountId) -> imap.send(to, subject, body, inReplyTo, attachments, accountId)
+            else -> gmail.send(to, subject, body, inReplyTo, attachments, accountId)
+        }
     }
 
     override fun markRead(localIds: Collection<Long>) {
-        if (real) gmail.markRead(localIds) else demo.markRead(localIds)
+        if (!real) { demo.markRead(localIds); return }
+        gmail.markRead(localIds.filter { !imap.owns(it) })
+        imap.markRead(localIds.filter { imap.owns(it) })
     }
 
     override fun moveMessages(localIds: Collection<Long>, folder: com.foldmail.app.Folder) {
-        if (real) gmail.moveMessages(localIds, folder) else demo.moveMessages(localIds, folder)
+        if (!real) { demo.moveMessages(localIds, folder); return }
+        gmail.moveMessages(localIds.filter { !imap.owns(it) }, folder)
+        imap.moveMessages(localIds.filter { imap.owns(it) }, folder)
     }
 
     override suspend fun fetchAttachment(localId: Long, attachment: Attachment) =
-        if (real) gmail.fetchAttachment(localId, attachment) else null
+        if (imap.owns(localId)) imap.fetchAttachment(localId, attachment) else if (real) gmail.fetchAttachment(localId, attachment) else null
 
-    override suspend fun resolveHtml(localId: Long) = if (real) gmail.resolveHtml(localId) else null
+    override suspend fun resolveHtml(localId: Long) =
+        if (imap.owns(localId)) imap.resolveHtml(localId) else if (real) gmail.resolveHtml(localId) else null
 
     override fun setStarred(localIds: Collection<Long>, starred: Boolean) {
-        if (real) gmail.setStarred(localIds, starred)
+        if (real) gmail.setStarred(localIds.filter { !imap.owns(it) }, starred)
     }
 
-    override fun refresh() = gmail.refresh()
+    override fun refresh() { gmail.refresh(); imap.refresh() }
 
     override suspend fun addGoogleAccount(accessToken: String) = gmail.addAccount(accessToken)
+
+    override suspend fun addImapAccount(config: ImapConfig) = imap.addAccount(config)
 }

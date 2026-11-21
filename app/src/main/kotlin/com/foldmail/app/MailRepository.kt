@@ -43,6 +43,20 @@ fun MailItem.slim(): MailItem = copy(html = null, inline = emptyList(), body = b
 /** [data] is standard base64 when the image is embedded in the message, else [attachmentId] must be downloaded. */
 data class InlinePart(val cid: String, val mime: String, val data: String?, val attachmentId: String?)
 
+/** Login data of an IMAP/POP3 account (security: ssl, starttls or none). */
+data class ImapConfig(
+    val protocol: String,
+    val email: String,
+    val username: String,
+    val password: String,
+    val host: String,
+    val port: Int,
+    val security: String,
+    val smtpHost: String,
+    val smtpPort: Int,
+    val smtpSecurity: String,
+)
+
 /** Target of "Move to" / Trash / Archive. */
 enum class Folder { Inbox, Archive, Trash }
 
@@ -72,6 +86,8 @@ interface MailRepository {
     fun refresh()
     /** Stores a Google account authorised with [accessToken] and starts syncing it. */
     suspend fun addGoogleAccount(accessToken: String)
+    /** Tests the login and stores an IMAP/POP3 account; throws with a readable message on failure. */
+    suspend fun addImapAccount(config: ImapConfig) { error("Nepodporované") }
 }
 
 /** In-memory implementation backed by [DemoData]; nothing is persisted or sent over the network. */
