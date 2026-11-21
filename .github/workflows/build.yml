@@ -29,5 +29,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk FoldMail-debug.apk
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest FoldMail-debug.apk --title "FoldMail debug APK" --notes "Automatický build z commitu ${GITHUB_SHA::7}" --target "$GITHUB_SHA"
+          # Remove every old "latest" release, drafts included (a draft is invisible to "gh release delete <tag>").
+          for id in $(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[] | select(.tag_name=="latest") | .id'); do
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id" || true
+          done
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/latest" || true
+          gh release create latest FoldMail-debug.apk --title "FoldMail debug APK" --notes "Automatický build z commitu ${GITHUB_SHA::7}" --target "$GITHUB_SHA" --latest
+          # Make sure it is published and not left as a draft.
+          gh release edit latest --draft=false
