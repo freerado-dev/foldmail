@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -265,36 +266,26 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
 
         if (expanded) {
             // Left pane is user-resizable by dragging the divider; the right pane takes the rest.
-            val maxList = (maxWidth.value - RailWidthDp - MinDetailDp).coerceAtLeast(MinListDp)
+            val maxList = (maxWidth.value - MinDetailDp).coerceAtLeast(MinListDp)
             val leftWidth = listWidthDp.coerceIn(MinListDp, maxList)
             val dragger: (Float) -> Unit = { px -> listWidthDp = (leftWidth + px / density).coerceIn(MinListDp, maxList) }
-            Row(Modifier.fillMaxSize()) {
-                NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
-                    FloatingActionButton(
-                        onClick = { startCompose() },
-                        modifier = Modifier.padding(vertical = 12.dp),
-                    ) { Icon(Icons.Filled.Edit, contentDescription = "Nový email") }
-                    MainTab.entries.forEach { t ->
-                        NavigationRailItem(
-                            selected = tab == t && !composing,
-                            onClick = { tab = t; composing = false },
-                            icon = { Icon(t.icon, contentDescription = t.label) },
-                            label = { Text(t.label) },
-                        )
-                    }
+            val onTab: (MainTab) -> Unit = { tab = it; composing = false; viewingId = null }
+            if (tab == MainTab.Calendar) {
+                Column(Modifier.fillMaxSize()) {
+                    calendar(Modifier.weight(1f).fillMaxWidth())
+                    Box(Modifier.width(leftWidth.dp)) { CompactBottomBar(tab, onTab = onTab, onCompose = { startCompose() }) }
                 }
-                when (tab) {
-                    MainTab.Chats, MainTab.Groups -> {
-                        listPane(Modifier.width(leftWidth.dp).fillMaxHeight())
-                        PaneDivider(onDrag = dragger)
-                        detailPane(Modifier.weight(1f).fillMaxHeight())
+            } else {
+                Row(Modifier.fillMaxSize()) {
+                    // Navigation lives under the list (icons only), so the list and mail get the full height and width.
+                    Column(Modifier.width(leftWidth.dp).fillMaxHeight()) {
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            if (tab == MainTab.Contacts) contacts(Modifier.fillMaxSize()) else listPane(Modifier.fillMaxSize())
+                        }
+                        CompactBottomBar(tab, onTab = onTab, onCompose = { startCompose() })
                     }
-                    MainTab.Contacts -> {
-                        contacts(Modifier.width(leftWidth.dp).fillMaxHeight())
-                        PaneDivider(onDrag = dragger)
-                        detailPane(Modifier.weight(1f).fillMaxHeight())
-                    }
-                    MainTab.Calendar -> calendar(Modifier.weight(1f).fillMaxHeight())
+                    PaneDivider(onDrag = dragger)
+                    detailPane(Modifier.weight(1f).fillMaxHeight())
                 }
             }
         } else {
