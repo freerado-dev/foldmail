@@ -27,7 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -98,38 +98,29 @@ fun Modifier.safeTop(minimum: Int = 28): Modifier {
     return this.windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout)).padding(top = missing)
 }
 
-/** Samsung-style action row: Reply, Reply all, Forward, Delete, More. */
+/** Samsung-style action row: Reply, Reply all, Forward, Delete and (in the chat) Full. */
 @Composable
 fun MessageActionBar(onAction: (MessageAction) -> Unit, modifier: Modifier = Modifier, showFullEntry: Boolean = true) {
-    var menu by remember { mutableStateOf(false) }
     Column(modifier.fillMaxWidth()) {
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            ActionItem(Icons.AutoMirrored.Filled.Reply, "Odpovedať") { onAction(MessageAction.Reply) }
-            ActionItem(Icons.AutoMirrored.Filled.ReplyAll, "Odpov. všetkým") { onAction(MessageAction.ReplyAll) }
-            ActionItem(Icons.AutoMirrored.Filled.Forward, "Preposlať") { onAction(MessageAction.Forward) }
-            ActionItem(Icons.Filled.Delete, "Odstrániť") { onAction(MessageAction.Delete) }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                ActionItem(Icons.Filled.MoreVert, "Ďalšie") { menu = true }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (showFullEntry) {
-                        DropdownMenuItem(text = { Text("Zobraziť celý email") }, onClick = { menu = false; onAction(MessageAction.ShowFull) })
-                    }
-                    DropdownMenuItem(text = { Text("Odpovedať") }, onClick = { menu = false; onAction(MessageAction.Reply) })
-                }
-            }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp)) {
+            ActionItem(Icons.AutoMirrored.Filled.Reply, "Odpovedať", Modifier.weight(1f)) { onAction(MessageAction.Reply) }
+            ActionItem(Icons.AutoMirrored.Filled.ReplyAll, "Odpov. všetkým", Modifier.weight(1.3f)) { onAction(MessageAction.ReplyAll) }
+            ActionItem(Icons.AutoMirrored.Filled.Forward, "Preposlať", Modifier.weight(1f)) { onAction(MessageAction.Forward) }
+            ActionItem(Icons.Filled.Delete, "Odstrániť", Modifier.weight(1f)) { onAction(MessageAction.Delete) }
+            if (showFullEntry) ActionItem(Icons.Filled.OpenInFull, "Full", Modifier.weight(0.8f)) { onAction(MessageAction.ShowFull) }
         }
     }
 }
 
 @Composable
-private fun ActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun ActionItem(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
     Column(
-        Modifier.clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier.clickable(onClick = onClick).padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onSurface)
-        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
