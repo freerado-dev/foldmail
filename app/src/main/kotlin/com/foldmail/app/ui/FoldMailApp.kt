@@ -131,10 +131,10 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             vm.reportMessage("Prihlásenie zlyhalo: ${e.message ?: e.javaClass.simpleName}")
         }
     }
-    fun addAccount() {
+    fun authorizeAccount(email: String?) {
         scope.launch {
             try {
-                val r = GoogleAuth.authorize(context, null)
+                val r = GoogleAuth.authorize(context, email)
                 val pending = r.pendingIntent
                 if (r.hasResolution() && pending != null) {
                     authLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
@@ -144,6 +144,24 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             } catch (e: Exception) {
                 vm.reportMessage("Prihlásenie zlyhalo: ${e.message ?: e.javaClass.simpleName}")
             }
+        }
+    }
+    // Always show the account chooser so another Google account can be picked (not silently the first one again).
+    val pickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val email = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+        if (email != null) authorizeAccount(email)
+    }
+    fun addAccount() {
+        try {
+            val intent = com.google.android.gms.common.AccountPicker.newChooseAccountIntent(
+                com.google.android.gms.common.AccountPicker.AccountChooserOptions.Builder()
+                    .setAllowableAccountsTypes(listOf("com.google"))
+                    .setAlwaysShowAccountPicker(true)
+                    .build(),
+            )
+            pickerLauncher.launch(intent)
+        } catch (e: Exception) {
+            vm.reportMessage("Výber účtu zlyhal: ${e.message ?: e.javaClass.simpleName}")
         }
     }
     LaunchedEffect(ui.message) {
