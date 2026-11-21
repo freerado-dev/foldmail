@@ -42,8 +42,27 @@ class GmailRepository(private val context: Context) {
     /** Message-ID header -> gmail thread id, so replies stay in the same Gmail thread. */
     private val threadByMessageId = ConcurrentHashMap<String, String>()
 
+    private val store = MailStore(context)
+
     init {
-        if (accounts.value.isNotEmpty()) refresh()
+        // Show the mail saved on the device immediately, then fetch only what is new.
+        if (accounts.value.isNotEmpty()) scope.launch {
+            loadFromDisk()
+            sync()
+        }
+    }
+
+    private suspend fun loadFromDisk() {
+        val loaded = ArrayList<MailItem>()
+        for (account in accounts.value) {
+            for (s in store.loadAll(account.id)) {
+                cache["${account.id}:${s.gmailId}"] = s.item
+                gmailIds[s.item.email.localId] = Triple(account.id, s.gmailId, s.threadId)
+                s.item.email.messageId?.let { threadByMessageId[it] = s.threadId }
+                loaded += s.item
+            }
+        }
+        if (loaded.isNotEmpty() && items.value.isEmpty()) items.value = loaded.sortedBy { it.email.sentAtMillis }
     }
 
     private fun load(): List<Account> {
@@ -121,6 +140,7 @@ class GmailRepository(private val context: Context) {
                             gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
                             parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
                             cache["${account.id}:$id"] = parsed.item
+                            store.write(account.id, parsed.gmailId, parsed.threadId, parsed.item)
                         } catch (e: Exception) {
                             failure = e   // keep what we have; the next sync continues where this one stopped
                         }
@@ -130,7 +150,10 @@ class GmailRepository(private val context: Context) {
         }
         // Forget messages that disappeared on the server (deleted elsewhere).
         val keep = ids.map { "${account.id}:$it" }.toSet()
-        cache.keys.filter { it.startsWith("${account.id}:") && it !in keep }.forEach { cache.remove(it) }
+        cache.keys.filter { it.startsWith("${account.id}:") && it !in keep }.forEach {
+            cache.remove(it)
+            store.delete(account.id, it.substringAfter(':'))
+        }
         val result = ids.mapNotNull { cache["${account.id}:$it"] }
         if (failure != null && result.isEmpty()) throw failure!!
         return result
@@ -196,6 +219,7 @@ class GmailRepository(private val context: Context) {
             return
         }
         items.update { list -> list.filter { it.email.localId !in ids } }
+        ids.forEach { id -> gmailIds[id]?.let { (acc, gid, _) -> store.delete(acc, gid) } }
         cache.entries.removeAll { it.value.email.localId in ids }
         scope.launch {
             var failed: String? = null
@@ -270,6 +294,17 @@ class GmailRepository(private val context: Context) {
         if (localIds.isEmpty()) return
         items.update { list -> list.map { if (it.email.localId in localIds) it.copy(email = it.email.copy(isRead = true)) else it } }
         scope.launch {
+            // keep the saved copies in step with what is shown
+            for (id in localIds) {
+                val (acc, gid, tid) = gmailIds[id] ?: continue
+                val key = "$acc:$gid"
+                val cur = cache[key] ?: continue
+                if (!cur.email.isRead) {
+                    val upd = cur.copy(email = cur.email.copy(isRead = true))
+                    cache[key] = upd
+                    store.write(acc, gid, tid, upd)
+                }
+            }
             for (id in localIds) {
                 val (accountId, gmailId, _) = gmailIds[id] ?: continue
                 val account = accounts.value.firstOrNull { it.id == accountId } ?: continue

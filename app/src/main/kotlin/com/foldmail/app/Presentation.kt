@@ -130,7 +130,7 @@ fun wrapHtml(html: String?, plain: String): String {
         "<pre style=\"white-space:pre-wrap;font-family:sans-serif;margin:0\">$esc</pre>"
     }
     return "<!doctype html><html><head><meta charset=\"utf-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+        "<meta name=\"viewport\" content=\"width=device-width, minimum-scale=0.1, maximum-scale=5\">" +
         "<style>body{margin:12px;word-wrap:break-word;font-family:sans-serif;font-size:15px;color:#1d1d1f;background:#fff}" +
         "img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>$inner</body></html>"
 }
