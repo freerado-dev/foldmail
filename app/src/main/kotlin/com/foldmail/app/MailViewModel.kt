@@ -184,6 +184,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         message.value = "Účet pridaný, sťahujem poštu…"
     }
 
+    fun removeAccount(id: Long) {
+        if (viewState.value.account == id) selectAccount(null)
+        repo.removeAccount(id)
+        message.value = "Účet odstránený"
+    }
+
     fun reportMessage(text: String) { message.value = text }
     fun consumeMessage() { message.value = null }
 

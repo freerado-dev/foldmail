@@ -41,6 +41,10 @@ class AppMailRepository(context: Context) : MailRepository {
     override val accountAddress: String
         get() = gmail.accounts.value.firstOrNull()?.email ?: imap.accounts.value.firstOrNull()?.email ?: demo.accountAddress
 
+    override fun removeAccount(accountId: Long) {
+        if (isImap(accountId)) imap.removeAccount(accountId) else gmail.removeAccount(accountId)
+    }
+
     private fun isImap(accountId: Long) = imap.accounts.value.any { it.id == accountId }
 
     override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {

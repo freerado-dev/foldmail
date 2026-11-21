@@ -60,9 +60,22 @@ fun AccountsDrawer(
     onSync: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onAddImap: () -> Unit = {},
+    onRemoveAccount: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
+    var removeFor by remember { mutableStateOf<com.foldmail.app.Account?>(null) }
+    removeFor?.let { a ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { removeFor = null },
+            title = { Text("Odstrániť účet?") },
+            text = { Text("${a.email} sa odstráni z aplikácie a jeho stiahnutá pošta sa zmaže z tohto zariadenia. Schránka na serveri ostane nezmenená.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { removeFor = null; onRemoveAccount(a.id) }) { Text("Odstrániť", color = Color(0xFFE53935)) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { removeFor = null }) { Text("Zrušiť") } },
+        )
+    }
     fun soon() = Toast.makeText(context, "Táto funkcia príde neskôr", Toast.LENGTH_SHORT).show()
 
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background) {
@@ -120,6 +133,9 @@ fun AccountsDrawer(
                         Text(a.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Badge(ui.unreadByAccount[a.id] ?: 0)
+                    IconButton(onClick = { removeFor = a }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Odstrániť účet", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }

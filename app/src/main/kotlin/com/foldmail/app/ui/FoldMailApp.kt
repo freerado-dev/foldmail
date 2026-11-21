@@ -228,6 +228,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 onView = { vm.setView(it); showList() },
                 onAddAccount = { scope.launch { drawerState.close() }; addAccount() },
                 onSync = { vm.refresh(); scope.launch { drawerState.close() } },
+                onRemoveAccount = vm::removeAccount,
                 onAddImap = { showImap = true; scope.launch { drawerState.close() } },
                 onOpenSettings = { showSettings = true; composing = false; tab = MainTab.Chats; scope.launch { drawerState.close() } },
             )

@@ -128,6 +128,18 @@ class ImapRepository private constructor(private val context: Context) {
         refresh()
     }
 
+    /** Forgets the account (and its saved password) and deletes its mail from this device. */
+    fun removeAccount(accountId: Long) {
+        configs.remove(accountId)
+        accounts.value = accounts.value.filter { it.id != accountId }
+        saveAccounts()
+        cache.keys.removeAll { it.startsWith("$accountId:") }
+        index.entries.removeAll { it.value.first == accountId }
+        prefs.edit().remove("pop_read_$accountId").remove("pop_init_$accountId").apply()
+        publish()
+        scope.launch { store.deleteAccount(accountId) }
+    }
+
     // ---------------------------------------------------------------- connection
 
     private fun storeProtocol(cfg: ImapConfig): String =

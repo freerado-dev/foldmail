@@ -103,6 +103,17 @@ class GmailRepository private constructor(private val context: Context) {
         refresh()
     }
 
+    /** Forgets the account and deletes its mail from this device (the mailbox itself is untouched). */
+    fun removeAccount(accountId: Long) {
+        val list = accounts.value.filter { it.id != accountId }
+        save(list)
+        accounts.value = list
+        cache.keys.removeAll { it.startsWith("$accountId:") }
+        gmailIds.entries.removeAll { it.value.first == accountId }
+        items.value = cache.values.toList()
+        scope.launch { store.deleteAccount(accountId) }
+    }
+
     fun refresh() {
         if (accounts.value.isEmpty()) return
         scope.launch { sync() }

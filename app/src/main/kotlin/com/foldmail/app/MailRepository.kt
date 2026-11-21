@@ -88,6 +88,8 @@ interface MailRepository {
     suspend fun addGoogleAccount(accessToken: String)
     /** Tests the login and stores an IMAP/POP3 account; throws with a readable message on failure. */
     suspend fun addImapAccount(config: ImapConfig) { error("Nepodporované") }
+    /** Removes an account and its mail from this device. */
+    fun removeAccount(accountId: Long) {}
 }
 
 /** In-memory implementation backed by [DemoData]; nothing is persisted or sent over the network. */

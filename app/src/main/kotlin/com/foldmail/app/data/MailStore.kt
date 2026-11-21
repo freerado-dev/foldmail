@@ -50,6 +50,11 @@ class MailStore(context: Context) {
         null
     }
 
+    /** Removes everything stored for an account. */
+    fun deleteAccount(accountId: Long) {
+        try { File(root, accountId.toString()).deleteRecursively() } catch (_: Exception) {}
+    }
+
     fun delete(accountId: Long, gmailId: String) {
         try {
             File(dir(accountId), "$gmailId.json").delete()
