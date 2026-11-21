@@ -272,6 +272,8 @@ object MimeBuilder {
     fun build(
         from: String,
         to: List<String>,
+        cc: List<String> = emptyList(),
+        bcc: List<String> = emptyList(),
         subject: String,
         body: String,
         inReplyTo: String?,
@@ -283,6 +285,8 @@ object MimeBuilder {
         val sb = StringBuilder()
         sb.append("From: ").append(from).append("\r\n")
         sb.append("To: ").append(to.joinToString(", ")).append("\r\n")
+        if (cc.isNotEmpty()) sb.append("Cc: ").append(cc.joinToString(", ")).append("\r\n")
+        if (bcc.isNotEmpty()) sb.append("Bcc: ").append(bcc.joinToString(", ")).append("\r\n")
         sb.append("Subject: ").append(encodeWord(subject)).append("\r\n")
         if (!inReplyTo.isNullOrBlank()) sb.append("In-Reply-To: ").append(inReplyTo).append("\r\n")
         if (references.isNotEmpty()) sb.append("References: ").append(references.joinToString(" ")).append("\r\n")

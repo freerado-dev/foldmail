@@ -531,7 +531,7 @@ class ImapRepository private constructor(private val context: Context) {
 
     // ---------------------------------------------------------------- sending
 
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {
         val account = accounts.value.firstOrNull { it.id == accountId } ?: return
         val cfg = configs[account.id] ?: return
         val optimistic = -System.nanoTime()
@@ -541,7 +541,7 @@ class ImapRepository private constructor(private val context: Context) {
                     localId = optimistic, accountId = account.id, messageId = null, inReplyTo = inReplyTo,
                     references = emptyList(), subject = subject.ifBlank { "(bez predmetu)" },
                     sentAtMillis = System.currentTimeMillis(), accountAddress = account.email,
-                    from = account.email, to = to, isRead = true,
+                    from = account.email, to = to, cc = cc, isRead = true,
                 ),
                 body, attachments,
             )
@@ -552,6 +552,8 @@ class ImapRepository private constructor(private val context: Context) {
                 val msg = MimeMessage(session)
                 msg.setFrom(InternetAddress(cfg.email))
                 msg.setRecipients(Message.RecipientType.TO, to.joinToString(",").let { InternetAddress.parse(it, false) })
+                if (cc.isNotEmpty()) msg.setRecipients(Message.RecipientType.CC, InternetAddress.parse(cc.joinToString(","), false))
+                if (bcc.isNotEmpty()) msg.setRecipients(Message.RecipientType.BCC, InternetAddress.parse(bcc.joinToString(","), false))
                 msg.setSubject(subject, "UTF-8")
                 if (!inReplyTo.isNullOrBlank()) { msg.setHeader("In-Reply-To", inReplyTo); msg.setHeader("References", inReplyTo) }
                 if (attachments.none { it.uri != null }) {

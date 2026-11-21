@@ -102,6 +102,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeTo by rememberSaveable { mutableStateOf("") }
     var composeSubject by rememberSaveable { mutableStateOf("") }
     var composeBody by rememberSaveable { mutableStateOf("") }
+    var composeCc by rememberSaveable { mutableStateOf("") }
     var composeReplyTo by rememberSaveable { mutableStateOf<String?>(null) }
     var composeAccount by rememberSaveable { mutableStateOf(-1L) }
     var composeFiles by remember { mutableStateOf(emptyList<Attachment>()) }
@@ -170,7 +171,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; showSettings = false; scope.launch { drawerState.close() } }
 
     fun startCompose(to: String = "") {
-        composeTo = to; composeSubject = ""; composeBody = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList()
+        composeTo = to; composeSubject = ""; composeBody = ""; composeCc = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList()
         draftVersion++; composing = true; showSettings = false; tab = MainTab.Chats
     }
     fun openChat(key: String) { openKey = key; composing = false; showSettings = false; viewingId = null; tab = MainTab.Chats }
@@ -179,13 +180,14 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         when (a) {
             MessageAction.Reply, MessageAction.ReplyAll -> {
                 composeTo = replyRecipients(m, a == MessageAction.ReplyAll).joinToString(", ")
+                composeCc = ""
                 composeSubject = prefixSubject(m.subject, "Re: ")
                 composeBody = quoteForReply(m, body, ui.names)
                 composeReplyTo = m.messageId; composeAccount = m.accountId; composeFiles = emptyList()
                 draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
             }
             MessageAction.Forward -> {
-                composeTo = ""; composeSubject = prefixSubject(m.subject, "Fwd: ")
+                composeTo = ""; composeCc = ""; composeSubject = prefixSubject(m.subject, "Fwd: ")
                 composeBody = forwardBody(m, body)
                 composeReplyTo = null; composeAccount = m.accountId
                 val atts = ui.attachments[m.localId].orEmpty()
@@ -255,12 +257,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         initialTo = composeTo,
                         initialSubject = composeSubject,
                         initialBody = composeBody,
+                        initialCc = composeCc,
                         initialAttachments = composeFiles,
                         contacts = ui.contacts,
                         names = ui.names,
                         onClose = { composing = false },
-                        onSend = { to, subject, body, files ->
-                            vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 })
+                        onSend = { to, subject, body, files, cc, bcc ->
+                            vm.send(to, subject, body, composeReplyTo, files, composeAccount.takeIf { it >= 0 }, cc, bcc)
                             composing = false
                         },
                         modifier = mod,

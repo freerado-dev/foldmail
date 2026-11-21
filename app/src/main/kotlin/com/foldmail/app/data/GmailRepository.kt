@@ -194,7 +194,7 @@ class GmailRepository private constructor(private val context: Context) {
         if (failure != null && missingTotal > 0 && done == 0) throw failure!!
     }
 
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {
         val account = accounts.value.firstOrNull { it.id == accountId } ?: accounts.value.firstOrNull() ?: return
         // Show it immediately; the next sync replaces it with the real sent message.
         val localId = -System.nanoTime()
@@ -204,7 +204,7 @@ class GmailRepository private constructor(private val context: Context) {
                     localId = localId, accountId = account.id, messageId = null, inReplyTo = inReplyTo,
                     references = emptyList(), subject = subject.ifBlank { "(bez predmetu)" },
                     sentAtMillis = System.currentTimeMillis(), accountAddress = account.email,
-                    from = account.email, to = to, isRead = true,
+                    from = account.email, to = to, cc = cc, isRead = true,
                 ),
                 body, attachments,
             )
@@ -218,7 +218,7 @@ class GmailRepository private constructor(private val context: Context) {
                     MimeBuilder.Part(a.name, a.mimeType, bytes)
                 }
                 val raw = MimeBuilder.build(
-                    from = account.email, to = to, subject = subject, body = body,
+                    from = account.email, to = to, cc = cc, bcc = bcc, subject = subject, body = body,
                     inReplyTo = inReplyTo, references = listOfNotNull(inReplyTo), parts = parts,
                 )
                 GmailApi.send(token, raw, inReplyTo?.let { threadByMessageId[it] })

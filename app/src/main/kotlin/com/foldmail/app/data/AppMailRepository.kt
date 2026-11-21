@@ -43,11 +43,11 @@ class AppMailRepository(context: Context) : MailRepository {
 
     private fun isImap(accountId: Long) = imap.accounts.value.any { it.id == accountId }
 
-    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
+    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {
         when {
-            !real -> demo.send(to, subject, body, inReplyTo, attachments, accountId)
-            isImap(accountId) -> imap.send(to, subject, body, inReplyTo, attachments, accountId)
-            else -> gmail.send(to, subject, body, inReplyTo, attachments, accountId)
+            !real -> demo.send(to, subject, body, inReplyTo, attachments, accountId, cc, bcc)
+            isImap(accountId) -> imap.send(to, subject, body, inReplyTo, attachments, accountId, cc, bcc)
+            else -> gmail.send(to, subject, body, inReplyTo, attachments, accountId, cc, bcc)
         }
     }
 

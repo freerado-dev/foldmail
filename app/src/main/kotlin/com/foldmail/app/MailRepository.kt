@@ -72,7 +72,7 @@ interface MailRepository {
     val accounts: StateFlow<List<Account>>
     val status: StateFlow<SyncStatus>
     val accountAddress: String
-    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList(), accountId: Long = 1)
+    fun send(to: List<String>, subject: String, body: String, inReplyTo: String? = null, attachments: List<Attachment> = emptyList(), accountId: Long = 1, cc: List<String> = emptyList(), bcc: List<String> = emptyList())
     fun markRead(localIds: Collection<Long>)
     /** Trash removes the messages for real (on the Gmail server too); other folders are local only. */
     fun moveMessages(localIds: Collection<Long>, folder: Folder)
@@ -102,7 +102,7 @@ class InMemoryMailRepository(
     private val state = MutableStateFlow(seed)
     override val items: StateFlow<List<MailItem>> = state
 
-    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
+    override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {
         state.update { list ->
             val id = (list.maxOfOrNull { it.email.localId } ?: 0L) + 1
             val parent = inReplyTo?.let { ref -> list.firstOrNull { it.email.messageId == ref }?.email }
@@ -116,7 +116,7 @@ class InMemoryMailRepository(
                 sentAtMillis = clock(),
                 accountAddress = accountAddress,
                 from = accountAddress,
-                to = to,
+                to = to, cc = cc,
                 isRead = true,
             )
             list + MailItem(mail, body, attachments)

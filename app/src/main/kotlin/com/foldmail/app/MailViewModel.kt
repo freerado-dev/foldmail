@@ -158,9 +158,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun send(
         to: List<String>, subject: String, body: String, inReplyTo: String? = null,
         attachments: List<Attachment> = emptyList(), accountId: Long? = null,
+        cc: List<String> = emptyList(), bcc: List<String> = emptyList(),
     ) = repo.send(
         to, subject, body, inReplyTo, attachments,
         accountId ?: viewState.value.account ?: repo.accounts.value.firstOrNull()?.id ?: 1L,
+        cc, bcc,
     )
 
     fun refresh() = repo.refresh()
