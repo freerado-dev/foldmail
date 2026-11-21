@@ -38,7 +38,9 @@ data class MailUiState(
     val conversations: List<PersonConversation> = emptyList(),
     val bodies: Map<Long, String> = emptyMap(),
     val attachments: Map<Long, List<Attachment>> = emptyMap(),
-    val htmls: Map<Long, String> = emptyMap(),
+    /** Messages that are shown rendered as HTML (the HTML is loaded on demand). */
+    val richIds: Set<Long> = emptySet(),
+    val syncProgress: String? = null,
     /** Pre-computed one-line previews of each conversation's last message. */
     val previews: Map<Long, String> = emptyMap(),
     val names: Map<String, String> = emptyMap(),
@@ -102,7 +104,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             bodies = bodies,
             attachments = items.associate { it.email.localId to it.attachments },
             previews = visible.associate { it.last.localId to previewOf(bodies[it.last.localId].orEmpty()) },
-            htmls = items.mapNotNull { m -> m.html?.let { m.email.localId to it } }.toMap(),
+            richIds = items.filter { it.rich }.mapTo(HashSet()) { it.email.localId },
             names = nameDirectory(emails),
             selfAddress = repo.accountAddress,
             accounts = accounts,
@@ -112,6 +114,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             flags = f,
             syncing = sm.first.syncing,
             syncError = sm.first.error,
+            syncProgress = sm.first.progress,
             message = sm.second,
         )
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)

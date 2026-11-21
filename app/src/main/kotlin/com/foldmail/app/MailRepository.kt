@@ -31,7 +31,14 @@ data class MailItem(
     val html: String? = null,
     /** Images referenced from the HTML as cid:... */
     val inline: List<InlinePart> = emptyList(),
+    /** True when the HTML has images/tables and is shown rendered. The HTML itself lives on disk only. */
+    val rich: Boolean = false,
 )
+
+const val MAX_BODY_IN_MEMORY = 30_000
+
+/** Version kept in memory: no HTML (it is read from disk when needed) and a bounded body. */
+fun MailItem.slim(): MailItem = copy(html = null, inline = emptyList(), body = body.take(MAX_BODY_IN_MEMORY))
 
 /** [data] is standard base64 when the image is embedded in the message, else [attachmentId] must be downloaded. */
 data class InlinePart(val cid: String, val mime: String, val data: String?, val attachmentId: String?)
@@ -40,7 +47,7 @@ data class InlinePart(val cid: String, val mime: String, val data: String?, val 
 enum class Folder { Inbox, Archive, Trash }
 
 /** Progress/error of background synchronisation, shown as a thin bar and a message in the list. */
-data class SyncStatus(val syncing: Boolean = false, val error: String? = null)
+data class SyncStatus(val syncing: Boolean = false, val error: String? = null, val progress: String? = null)
 
 /**
  * The seam where the data layer plugs in. The UI only talks to this interface.

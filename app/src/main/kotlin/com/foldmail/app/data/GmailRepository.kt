@@ -56,20 +56,19 @@ class GmailRepository private constructor(private val context: Context) {
     /** Waits for the start-up load and runs a full sync (used by the background worker). */
     suspend fun syncNow() {
         loadJob?.join()
-        syncMutex.withLock { runSync() }
+        syncMutex.withLock { runSync(maxFetch = 1500) }
     }
 
     private suspend fun loadFromDisk() {
-        val loaded = ArrayList<MailItem>()
         for (account in accounts.value) {
-            for (s in store.loadAll(account.id)) {
-                cache["${account.id}:${s.gmailId}"] = s.item
-                gmailIds[s.item.email.localId] = Triple(account.id, s.gmailId, s.threadId)
-                s.item.email.messageId?.let { threadByMessageId[it] = s.threadId }
-                loaded += s.item
+            val stored = withContext(Dispatchers.IO) { store.loadAll(account.id) }
+            for (st in stored) {
+                cache["${account.id}:${st.gmailId}"] = st.item
+                gmailIds[st.item.email.localId] = Triple(account.id, st.gmailId, st.threadId)
+                st.item.email.messageId?.let { threadByMessageId[it] = st.threadId }
             }
         }
-        if (loaded.isNotEmpty() && items.value.isEmpty()) items.value = loaded.sortedBy { it.email.sentAtMillis }
+        if (cache.isNotEmpty() && items.value.isEmpty()) items.value = cache.values.toList()
     }
 
     private fun load(): List<Account> {
@@ -117,56 +116,65 @@ class GmailRepository private constructor(private val context: Context) {
         }
     }
 
-    private suspend fun runSync() {
-        run {
-            status.value = SyncStatus(syncing = true)
-            val all = ArrayList<MailItem>()
-            val errors = ArrayList<String>()
-            for (account in accounts.value) {
-                try {
-                    all += syncAccount(account)
-                } catch (e: Exception) {
-                    errors += "${account.email}: ${e.message ?: e.javaClass.simpleName}"
-                }
+    private suspend fun runSync(maxFetch: Int = FETCH_PER_SYNC) {
+        status.value = SyncStatus(syncing = true)
+        val errors = ArrayList<String>()
+        for (account in accounts.value) {
+            try {
+                syncAccount(account, maxFetch)
+            } catch (e: Exception) {
+                errors += "${account.email}: ${e.message ?: e.javaClass.simpleName}"
             }
-            if (errors.isEmpty() || all.isNotEmpty()) items.value = all
-            status.value = SyncStatus(false, errors.firstOrNull())
         }
+        if (errors.isEmpty() || cache.isNotEmpty()) items.value = cache.values.toList()
+        status.value = SyncStatus(false, errors.firstOrNull())
     }
 
-    private suspend fun syncAccount(account: Account): List<MailItem> {
+    /**
+     * Brings the device up to date with Gmail: all received and sent mail (no spam, trash or drafts).
+     * New mail is fetched first; the rest of the history is downloaded in portions of [maxFetch] per sync.
+     */
+    private suspend fun syncAccount(account: Account, maxFetch: Int) {
         val token = GoogleAuth.accessToken(context, account.email)
-        val ids = (
-            GmailApi.listIds(token, "INBOX", INBOX_COUNT) + GmailApi.listIds(token, "SENT", SENT_COUNT) +
-                GmailApi.listIdsQuery(token, "-in:inbox -in:sent -in:trash -in:spam -in:drafts", ARCHIVE_COUNT)
-            ).distinct()
-        // Download only what is new (plus the newest few, to pick up read/unread changes).
-        val hadCache = cache.keys.any { it.startsWith("${account.id}:") }
-        val fresh = ids.filter { !cache.containsKey("${account.id}:$it") }
+        val ids = GmailApi.listAllIds(token)
+        val prefix = "${account.id}:"
+        val hadCache = cache.keys.any { it.startsWith(prefix) }
+        val fresh = ids.filter { !cache.containsKey(prefix + it) }.take(maxFetch)
+        // The newest few are downloaded again to pick up read/unread changes.
         val toFetch = (fresh + ids.take(REFRESH_NEWEST)).distinct()
+        val missingTotal = ids.count { !cache.containsKey(prefix + it) }
         val gate = Semaphore(4)
         var failure: Exception? = null
-        coroutineScope {
-            toFetch.map { id ->
-                async {
-                    gate.withPermit {
-                        try {
-                            val parsed = GmailParser.parse(GmailApi.getMessage(token, id), account.id, account.email)
-                            gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
-                            parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
-                            cache["${account.id}:$id"] = parsed.item
-                            store.write(account.id, parsed.gmailId, parsed.threadId, parsed.item)
-                        } catch (e: Exception) {
-                            failure = e   // keep what we have; the next sync continues where this one stopped
+        var done = 0
+        for (chunk in toFetch.chunked(60)) {
+            coroutineScope {
+                chunk.map { id ->
+                    async {
+                        gate.withPermit {
+                            try {
+                                val parsed = GmailParser.parse(GmailApi.getMessage(token, id), account.id, account.email)
+                                gmailIds[parsed.item.email.localId] = Triple(account.id, parsed.gmailId, parsed.threadId)
+                                parsed.item.email.messageId?.let { threadByMessageId[it] = parsed.threadId }
+                                store.writeHtml(account.id, parsed.gmailId, parsed.item.html, parsed.item.inline)
+                                val slim = parsed.item.slim()
+                                store.write(account.id, parsed.gmailId, parsed.threadId, slim)
+                                cache[prefix + id] = slim
+                            } catch (e: Exception) {
+                                failure = e   // keep what we have; the next sync continues where this one stopped
+                            }
                         }
                     }
-                }
-            }.awaitAll()
+                }.awaitAll()
+            }
+            done += chunk.size
+            items.value = cache.values.toList()
+            val have = cache.keys.count { it.startsWith(prefix) }
+            status.value = SyncStatus(true, null, if (have < ids.size) "Sťahujem správy: $have / ${ids.size}" else null)
         }
         // Announce unread incoming mail that appeared since the last sync (not on the very first download).
         if (hadCache) {
             val recent = System.currentTimeMillis() - 3L * 24 * 3600 * 1000
-            val news = fresh.mapNotNull { cache["${account.id}:$it"] }
+            val news = fresh.mapNotNull { cache[prefix + it] }
                 .filter { !it.email.isOutgoing && !it.email.isRead && it.email.sentAtMillis > recent }
                 .sortedBy { it.email.sentAtMillis }
                 .map {
@@ -176,15 +184,13 @@ class GmailRepository private constructor(private val context: Context) {
                 }
             Notifier.notifyNew(context, news)
         }
-        // Forget messages that disappeared on the server (deleted elsewhere).
-        val keep = ids.map { "${account.id}:$it" }.toSet()
-        cache.keys.filter { it.startsWith("${account.id}:") && it !in keep }.forEach {
+        // Forget messages that disappeared on the server (deleted elsewhere, moved to spam or trash).
+        val keep = ids.mapTo(HashSet()) { prefix + it }
+        cache.keys.filter { it.startsWith(prefix) && it !in keep }.forEach {
             cache.remove(it)
             store.delete(account.id, it.substringAfter(':'))
         }
-        val result = ids.mapNotNull { cache["${account.id}:$it"] }
-        if (failure != null && result.isEmpty()) throw failure!!
-        return result
+        if (failure != null && missingTotal > 0 && done == 0) throw failure!!
     }
 
     fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long) {
@@ -304,12 +310,13 @@ class GmailRepository private constructor(private val context: Context) {
 
     /** Replaces cid: references in the HTML with the embedded images. */
     suspend fun resolveHtml(localId: Long): String? = withContext(Dispatchers.IO) {
-        val item = items.value.firstOrNull { it.email.localId == localId } ?: return@withContext null
-        var html = item.html ?: return@withContext null
-        if (item.inline.isEmpty()) return@withContext html
-        val (email, gmailId, _) = tokenFor(localId) ?: return@withContext html
+        val (email, gmailId, _) = tokenFor(localId) ?: return@withContext null
+        val accountId = gmailIds[localId]?.first ?: return@withContext null
+        val (html0, inline) = store.readHtml(accountId, gmailId) ?: return@withContext null
+        var html = html0
+        if (inline.isEmpty()) return@withContext html
         val token = GoogleAuth.accessToken(context, email)
-        for (p in item.inline) {
+        for (p in inline) {
             val data = p.data ?: try {
                 java.util.Base64.getEncoder().encodeToString(GmailApi.attachment(token, gmailId, p.attachmentId ?: continue))
             } catch (_: Exception) { continue }
@@ -350,9 +357,7 @@ class GmailRepository private constructor(private val context: Context) {
         fun get(context: Context): GmailRepository =
             instance ?: synchronized(this) { instance ?: GmailRepository(context.applicationContext).also { instance = it } }
 
-        private const val INBOX_COUNT = 200
-        private const val SENT_COUNT = 100
-        private const val ARCHIVE_COUNT = 50
+        private const val FETCH_PER_SYNC = 400
         private const val REFRESH_NEWEST = 25
         private val PALETTE = listOf(0xFFFF3B30, 0xFF0A28F0, 0xFF34C759, 0xFFFFCC00, 0xFFAF52DE, 0xFFFF2D55, 0xFF5AC8FA)
     }

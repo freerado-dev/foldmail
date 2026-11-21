@@ -4,12 +4,17 @@ import android.content.Context
 import com.foldmail.app.Attachment
 import com.foldmail.app.InlinePart
 import com.foldmail.app.MailItem
+import com.foldmail.app.isRichHtml
 import com.foldmail.domain.model.EmailMessage
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** Keeps downloaded mail on the device: one small JSON file per message, so a sync only writes what changed. */
+/**
+ * Keeps downloaded mail on the device. Per message there are two small files: `<id>.json` (headers, text,
+ * attachments – always loaded) and `<id>.html` (HTML + inline images – read only when a mail is displayed),
+ * so thousands of mails stay light in memory.
+ */
 class MailStore(context: Context) {
     private val root = File(context.filesDir, "mail")
 
@@ -17,28 +22,70 @@ class MailStore(context: Context) {
 
     private fun dir(accountId: Long) = File(root, accountId.toString()).apply { mkdirs() }
 
+    private fun atomic(target: File, text: String) {
+        val tmp = File(target.parentFile, target.name + ".tmp")
+        tmp.writeText(text)
+        tmp.renameTo(target)
+    }
+
+    /** Headers, text and attachments (HTML is not part of it). */
     fun write(accountId: Long, gmailId: String, threadId: String, item: MailItem) {
+        try { atomic(File(dir(accountId), "$gmailId.json"), toJson(gmailId, threadId, item).toString()) } catch (_: Exception) {}
+    }
+
+    fun writeHtml(accountId: Long, gmailId: String, html: String?, inline: List<InlinePart>) {
+        if (html == null) return
         try {
-            val target = File(dir(accountId), "$gmailId.json")
-            val tmp = File(dir(accountId), "$gmailId.tmp")
-            tmp.writeText(toJson(gmailId, threadId, item).toString())
-            tmp.renameTo(target)
-        } catch (_: Exception) {
-            // storage is a cache; ignore failures
-        }
+            val o = JSONObject().put("html", html).put("inline", inlineToJson(inline))
+            atomic(File(dir(accountId), "$gmailId.html"), o.toString())
+        } catch (_: Exception) {}
+    }
+
+    /** HTML and inline images of a message, or null. Also understands the older single-file format. */
+    fun readHtml(accountId: Long, gmailId: String): Pair<String, List<InlinePart>>? = try {
+        val f = File(dir(accountId), "$gmailId.html")
+        val o = if (f.exists()) JSONObject(f.readText()) else JSONObject(File(dir(accountId), "$gmailId.json").readText())
+        if (o.has("html") && !o.isNull("html")) o.getString("html") to inlineFromJson(o.optJSONArray("inline")) else null
+    } catch (_: Exception) {
+        null
     }
 
     fun delete(accountId: Long, gmailId: String) {
-        try { File(dir(accountId), "$gmailId.json").delete() } catch (_: Exception) {}
+        try {
+            File(dir(accountId), "$gmailId.json").delete()
+            File(dir(accountId), "$gmailId.html").delete()
+        } catch (_: Exception) {}
     }
 
     fun loadAll(accountId: Long): List<Stored> =
-        dir(accountId).listFiles { f -> f.name.endsWith(".json") }.orEmpty().mapNotNull {
-            try { fromJson(JSONObject(it.readText())) } catch (_: Exception) { null }
+        dir(accountId).listFiles { f -> f.name.endsWith(".json") }.orEmpty().mapNotNull { f ->
+            try {
+                val o = JSONObject(f.readText())
+                val s = fromJson(o)
+                if (o.has("html") && !o.isNull("html")) {
+                    // older format: move the HTML out of the always-loaded file
+                    writeHtml(accountId, s.gmailId, o.getString("html"), inlineFromJson(o.optJSONArray("inline")))
+                    write(accountId, s.gmailId, s.threadId, s.item)
+                }
+                s
+            } catch (_: Exception) {
+                null
+            }
         }
 
     private fun strList(a: JSONArray?): List<String> = a?.let { (0 until it.length()).map { i -> it.getString(i) } } ?: emptyList()
     private fun optStr(o: JSONObject, k: String): String? = if (o.has(k) && !o.isNull(k)) o.getString(k) else null
+
+    private fun inlineToJson(inline: List<InlinePart>) = JSONArray().also { arr ->
+        inline.forEach { p -> arr.put(JSONObject().put("cid", p.cid).put("mime", p.mime).put("data", p.data).put("attId", p.attachmentId)) }
+    }
+
+    private fun inlineFromJson(arr: JSONArray?): List<InlinePart> = arr?.let {
+        (0 until it.length()).map { i ->
+            val p = it.getJSONObject(i)
+            InlinePart(p.getString("cid"), p.getString("mime"), optStr(p, "data"), optStr(p, "attId"))
+        }
+    } ?: emptyList()
 
     private fun toJson(gmailId: String, threadId: String, item: MailItem): JSONObject {
         val e = item.email
@@ -51,16 +98,11 @@ class MailStore(context: Context) {
             .put("accountAddress", e.accountAddress).put("from", e.from)
             .put("to", JSONArray(e.to)).put("cc", JSONArray(e.cc))
             .put("isRead", e.isRead)
-            .put("body", item.body).put("html", item.html)
+            .put("body", item.body.take(com.foldmail.app.MAX_BODY_IN_MEMORY)).put("rich", item.rich)
             .put("attachments", JSONArray().also { arr ->
                 item.attachments.forEach { a ->
                     arr.put(JSONObject().put("name", a.name).put("uri", a.uri).put("mime", a.mimeType)
                         .put("size", a.sizeBytes).put("remoteId", a.remoteId))
-                }
-            })
-            .put("inline", JSONArray().also { arr ->
-                item.inline.forEach { p ->
-                    arr.put(JSONObject().put("cid", p.cid).put("mime", p.mime).put("data", p.data).put("attId", p.attachmentId))
                 }
             })
     }
@@ -84,12 +126,8 @@ class MailStore(context: Context) {
                 )
             }
         } ?: emptyList()
-        val inline = o.optJSONArray("inline")?.let { arr ->
-            (0 until arr.length()).map { i ->
-                val p = arr.getJSONObject(i)
-                InlinePart(p.getString("cid"), p.getString("mime"), optStr(p, "data"), optStr(p, "attId"))
-            }
-        } ?: emptyList()
-        return Stored(o.getString("gid"), o.optString("tid"), MailItem(email, o.optString("body"), attachments, optStr(o, "html"), inline))
+        val rich = if (o.has("rich")) o.getBoolean("rich") else isRichHtml(optStr(o, "html"))
+        val body = o.optString("body").take(com.foldmail.app.MAX_BODY_IN_MEMORY)
+        return Stored(o.getString("gid"), o.optString("tid"), MailItem(email, body, attachments, null, emptyList(), rich))
     }
 }

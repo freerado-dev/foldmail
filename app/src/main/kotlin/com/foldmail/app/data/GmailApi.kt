@@ -70,6 +70,20 @@ object GmailApi {
         return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }
     }
 
+    /** Every message id, newest first, without spam, trash and drafts. */
+    fun listAllIds(token: String): List<String> {
+        val out = ArrayList<String>()
+        var page: String? = null
+        do {
+            val q = java.net.URLEncoder.encode("-in:drafts", "UTF-8")
+            val url = "$BASE/messages?q=$q&maxResults=500" + (page?.let { "&pageToken=$it" } ?: "")
+            val json = JSONObject(request("GET", url, token))
+            json.optJSONArray("messages")?.let { arr -> for (i in 0 until arr.length()) out += arr.getJSONObject(i).getString("id") }
+            page = json.optString("nextPageToken").ifBlank { null }
+        } while (page != null)
+        return out
+    }
+
     /** Raw bytes of an attachment. */
     fun attachment(token: String, messageId: String, attachmentId: String): ByteArray {
         val data = JSONObject(request("GET", "$BASE/messages/$messageId/attachments/$attachmentId", token)).getString("data")
@@ -136,7 +150,7 @@ object GmailParser {
             cc = splitAddresses(headers["cc"].orEmpty()).map(::decodeHeader),
             isRead = "UNREAD" !in labels,
         )
-        return ParsedMessage(MailItem(email, body, attachments, html.toString().ifBlank { null }, inline), id, json.optString("threadId"))
+        return ParsedMessage(MailItem(email, body, attachments, html.toString().ifBlank { null }, inline, rich = com.foldmail.app.isRichHtml(html.toString())), id, json.optString("threadId"))
     }
 
     private fun walk(part: JSONObject, plain: StringBuilder, html: StringBuilder, attachments: MutableList<Attachment>, inline: MutableList<InlinePart>) {

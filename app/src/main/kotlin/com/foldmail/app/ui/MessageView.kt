@@ -76,7 +76,7 @@ fun RichHtmlCard(
         modifier = modifier.widthIn(max = 640.dp),
     ) {
         androidx.compose.foundation.layout.Box {
-            HtmlView(html, plain, Modifier.fillMaxWidth(), inline = true)
+            HtmlView(html.takeIf { it.isNotBlank() }, plain, Modifier.fillMaxWidth(), inline = true)
             // Transparent layer on top: the WebView never steals scroll gestures from the chat list.
             androidx.compose.foundation.layout.Box(
                 Modifier.matchParentSize().combinedClickable(onClick = onOpen, onLongClick = onSelect),
@@ -179,8 +179,8 @@ fun MessageViewPane(
     resolveHtml: suspend (Long) -> String?,
     modifier: Modifier = Modifier,
 ) {
-    val html by androidx.compose.runtime.produceState<String?>(ui.htmls[message.localId], message.localId) {
-        value = try { resolveHtml(message.localId) } catch (_: Exception) { null } ?: ui.htmls[message.localId]
+    val html by androidx.compose.runtime.produceState<String?>(null, message.localId) {
+        value = try { resolveHtml(message.localId) } catch (_: Exception) { null }
     }
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

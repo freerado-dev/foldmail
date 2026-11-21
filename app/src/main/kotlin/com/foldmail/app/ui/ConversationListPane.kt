@@ -136,6 +136,9 @@ fun ConversationListPane(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         if (ui.syncing) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp))
+        ui.syncProgress?.let {
+            Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp), fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         ui.syncError?.let {
             Text(
                 it, Modifier.fillMaxWidth().background(Color(0xFFFFF0F0)).padding(horizontal = 12.dp, vertical = 4.dp),

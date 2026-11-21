@@ -71,10 +71,16 @@ private val FoldTypography = Typography().let { t ->
 
 @Composable
 fun FoldMailTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
+    val scheme = if (darkTheme) Dark else Light
     MaterialTheme(
-        colorScheme = if (darkTheme) Dark else Light,
+        colorScheme = scheme,
         shapes = FoldShapes,
         typography = FoldTypography,
-        content = content,
-    )
+    ) {
+        // Text without an explicit colour must follow the theme everywhere (not only inside a Surface).
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides scheme.onBackground,
+            content = content,
+        )
+    }
 }
