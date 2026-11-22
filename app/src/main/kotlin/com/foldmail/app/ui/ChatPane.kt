@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -79,7 +81,19 @@ fun ChatPane(
 ) {
     var selectedId by rememberSaveable(conversation.key) { mutableStateOf<Long?>(null) }
     val title = conversation.title(ui.names, ui.selfAddress)
-    val messages = conversation.messages
+    val allMessages = conversation.messages
+    var searching by rememberSaveable(conversation.key) { mutableStateOf(false) }
+    var query by rememberSaveable(conversation.key) { mutableStateOf("") }
+    val searchState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val q = remember(query) { plainText(query.trim()) }
+    val messages = if (searching && q.isNotEmpty()) {
+        allMessages.filter { m ->
+            plainText(m.subject + " " + ui.bodies[m.localId].orEmpty() + " " + nameOf(normalizeAddress(m.from), ui.names) + " " + m.from + " " +
+                ui.attachments[m.localId].orEmpty().joinToString(" ") { it.name }).contains(q)
+        }
+    } else allMessages
+    androidx.activity.compose.BackHandler(enabled = searching) { searching = false; query = "" }
+    LaunchedEffect(q, searching) { if (searching && messages.isNotEmpty()) searchState.scrollToItem(messages.size - 1) }
     // Header-based thread index per message -> the subject heading is shown where a thread starts.
     val threadOf = remember(conversation) {
         conversation.threads.flatMapIndexed { i, g -> g.messages.map { it.localId to i } }.toMap()
@@ -100,13 +114,39 @@ fun ChatPane(
     }
 
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop(minimum = 4, cutout = false).imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 0.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (searching) {
+            val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+            LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { searching = false; query = "" }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zavrieť hľadanie")
+                }
+                androidx.compose.material3.TextField(
+                    query, { query = it },
+                    Modifier.weight(1f).focusRequester(focus),
+                    placeholder = { Text("Hľadať v chate: $title", maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    singleLine = true, shape = RoundedCornerShape(14.dp),
+                    trailingIcon = {
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Zmazať") }
+                    },
+                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
+            if (q.isNotEmpty()) Text(
+                if (messages.isEmpty()) "Nič sa nenašlo" else "Nájdené: ${messages.size}",
+                Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 0.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Späť") }
             } else {
                 Spacer(Modifier.width(12.dp))
             }
-            Column(Modifier.padding(start = 4.dp)) {
+            Column(Modifier.padding(start = 4.dp).weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val lastMsg = conversation.last
                 Text(
@@ -122,11 +162,14 @@ fun ChatPane(
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
+            IconButton(onClick = { searching = true }, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Filled.Search, contentDescription = "Hľadať v chate")
+            }
         }
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
-            state = listState,
+            state = if (searching) searchState else listState,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
@@ -166,12 +209,14 @@ fun ChatPane(
             }
         }
 
-        MessageActionBar(onAction = { a ->
-            val target = messages.firstOrNull { it.localId == selectedId } ?: messages.lastOrNull()
-            if (target != null) onAction(a, target)
-            if (a == MessageAction.Delete) selectedId = null
-        })
-        ReplyBar(conversation.key, title, conversation.last.subject, onSend = onReply)
+        if (!searching) {
+            MessageActionBar(onAction = { a ->
+                val target = messages.firstOrNull { it.localId == selectedId } ?: messages.lastOrNull()
+                if (target != null) onAction(a, target)
+                if (a == MessageAction.Delete) selectedId = null
+            })
+            ReplyBar(conversation.key, title, conversation.last.subject, onSend = onReply)
+        }
     }
 }
 
@@ -333,3 +378,7 @@ class ChatScrollState {
     val heights = HashMap<String, HashMap<Long, Int>>()
     val seenCounts = HashMap<String, Int>()
 }
+
+/** Lower case without diacritics, so "skuska" finds "skúška". */
+private fun plainText(s: String): String =
+    java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()
