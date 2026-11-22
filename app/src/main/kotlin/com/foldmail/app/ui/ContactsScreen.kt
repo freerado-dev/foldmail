@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,14 +35,34 @@ fun ContactsScreen(
     val own = ui.selfAddress.lowercase()
     val addresses = ui.conversations.flatMap { it.participants }.filter { it != own }.distinct()
         .sortedBy { nameOf(it, ui.names).lowercase() }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val q = query.trim().lowercase()
+    val shown = if (q.isEmpty()) addresses else addresses.filter { q in it.lowercase() || q in nameOf(it, ui.names).lowercase() }
 
     Column(modifier.safeTop()) {
         Text(
             "Kontakty", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
         )
+        androidx.compose.material3.TextField(
+            query, { query = it },
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            placeholder = { Text("Hľadať kontakt", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { query = "" }) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Close, "Zmazať")
+                }
+            },
+            singleLine = true, shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            ),
+        )
+        if (shown.isEmpty()) Text("Nič sa nenašlo.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         LazyColumn(Modifier.fillMaxSize()) {
-            items(addresses, key = { it }) { address ->
+            items(shown, key = { it }) { address ->
                 val name = nameOf(address, ui.names)
                 Row(
                     Modifier.fillMaxWidth()

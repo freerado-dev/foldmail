@@ -293,16 +293,19 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private fun Set<String>.toggle(k: String) = if (k in this) this - k else this + k
 }
 
-/** Addresses from all mail, newest first, without the user's own accounts. */
+/** Addresses from all mail, most used first (mail you sent counts triple), then newest; without the user's own accounts. */
 private fun contactList(emails: List<EmailMessage>, own: Set<String>): List<String> {
     val last = HashMap<String, Long>()
+    val score = HashMap<String, Int>()
     for (m in emails) {
+        val sentByMe = m.from.let { com.foldmail.domain.model.normalizeAddress(it) } in own
         for (raw in listOf(m.from) + m.to + m.cc) {
             val a = com.foldmail.domain.model.normalizeAddress(raw)
             if ('@' !in a || a in own) continue
+            score[a] = (score[a] ?: 0) + if (sentByMe) 3 else 1
             val t = last[a]
             if (t == null || m.sentAtMillis > t) last[a] = m.sentAtMillis
         }
     }
-    return last.entries.sortedByDescending { it.value }.take(3000).map { it.key }
+    return last.keys.sortedWith(compareByDescending<String> { score[it] ?: 0 }.thenByDescending { last[it] ?: 0L }).take(3000)
 }
