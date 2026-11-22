@@ -54,7 +54,7 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier, accounts: 
     val preview by settings.notificationPreview.collectAsState()
     val remoteImages by settings.remoteImages.collectAsState()
     val syncMinutes by settings.syncMinutes.collectAsState()
-    var sigAccount by androidx.compose.runtime.rememberSaveable { mutableStateOf(-1L) }
+    var sigAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1L) }
     val sigId = accounts.firstOrNull { it.id == sigAccount }?.id ?: accounts.firstOrNull()?.id ?: -1L
     var photoVersion by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var sigOn by remember(sigId) { mutableStateOf(Signature.enabled(context, sigId)) }
