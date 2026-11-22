@@ -44,9 +44,36 @@ object AvatarImages {
         return if (p[p.size - 2] in twoPart && p.last().length == 2) p.takeLast(3).joinToString(".") else p.takeLast(2).joinToString(".")
     }
 
-    suspend fun load(context: Context, address: String): Bitmap? {
+    /** Bumped whenever an own photo changes so that avatars reload. */
+    val version = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    private fun customFile(context: Context, addr: String) = File(context.filesDir, "photo_" + md5(addr.trim().lowercase()) + ".jpg")
+
+    fun hasCustom(context: Context, addr: String) = customFile(context, addr).exists()
+
+    /** Own picture for an account address: square crop, 192 px. */
+    fun saveCustom(context: Context, addr: String, uri: android.net.Uri): Boolean = try {
+        val bmp = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        if (bmp == null) false else {
+            val side = minOf(bmp.width, bmp.height)
+            val sq = Bitmap.createBitmap(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side)
+            val out = java.io.ByteArrayOutputStream()
+            Bitmap.createScaledBitmap(sq, 192, 192, true).compress(Bitmap.CompressFormat.JPEG, 90, out)
+            customFile(context, addr).writeBytes(out.toByteArray())
+            memory.remove(addr.trim().lowercase()); version.value++
+            true
+        }
+    } catch (_: Exception) { false }
+
+    fun removeCustom(context: Context, addr: String) {
+        customFile(context, addr).delete(); memory.remove(addr.trim().lowercase()); version.value++
+    }
+
+    suspend fun load(context: Context, address: String, allowNetwork: Boolean = true): Bitmap? {
         val addr = address.trim().lowercase()
         if (!addr.contains('@')) return null
+        customFile(context, addr).takeIf { it.exists() }?.let { f -> BitmapFactory.decodeFile(f.path)?.let { return it } }
+        if (!allowNetwork) return null
         memory.get(addr)?.let { return it }
         if (synchronized(missing) { addr in missing }) return null
         return withContext(Dispatchers.IO) {

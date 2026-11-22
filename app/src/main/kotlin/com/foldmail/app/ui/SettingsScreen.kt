@@ -90,6 +90,9 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier, accounts: 
             ChoiceRow("Tmavá téma", selected = dark) { settings.setDark(true) }
 
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+            Header("Fotky účtov")
+            accounts.forEach { acc -> AccountPhotoRow(acc.name.ifBlank { acc.email }, acc.email) }
+            HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             Header("Podpis (pre každý účet zvlášť)")
             if (accounts.isEmpty()) {
                 Text("Najprv pridaj emailový účet.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -219,5 +222,29 @@ private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Text(label, Modifier.padding(start = 4.dp))
+    }
+}
+
+@Composable
+private fun AccountPhotoRow(name: String, email: String) {
+    val context = LocalContext.current
+    val ver by com.foldmail.app.data.AvatarImages.version.collectAsState()
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !com.foldmail.app.data.AvatarImages.saveCustom(context, email, uri)) {
+            android.widget.Toast.makeText(context, "Fotku sa nepodarilo načítať", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Avatar(name, size = 40.dp, address = email)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        androidx.compose.material3.OutlinedButton(onClick = { pick.launch("image/*") }) {
+            Text(if (com.foldmail.app.data.AvatarImages.hasCustom(context, email) || ver < 0) "Zmeniť" else "Pridať")
+        }
+        if (com.foldmail.app.data.AvatarImages.hasCustom(context, email)) {
+            androidx.compose.material3.TextButton(onClick = { com.foldmail.app.data.AvatarImages.removeCustom(context, email) }) { Text("Odstrániť") }
+        }
     }
 }

@@ -33,8 +33,9 @@ private val AvatarColors = listOf(
 fun Avatar(title: String, size: Dp = 32.dp, modifier: Modifier = Modifier, isGroup: Boolean = false, address: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val enabled by remember(context) { com.foldmail.app.data.AppSettings.get(context).senderPhotos }.collectAsState()
-    val photo by produceState<android.graphics.Bitmap?>(null, address, enabled) {
-        value = if (enabled && address != null && !isGroup) com.foldmail.app.data.AvatarImages.load(context, address) else null
+    val ver by com.foldmail.app.data.AvatarImages.version.collectAsState()
+    val photo by produceState<android.graphics.Bitmap?>(null, address, enabled, ver) {
+        value = if (address != null && !isGroup) com.foldmail.app.data.AvatarImages.load(context, address, enabled) else null
     }
     val color = AvatarColors[(title.hashCode() and Int.MAX_VALUE) % AvatarColors.size]
     Box(

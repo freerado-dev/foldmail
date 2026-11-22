@@ -240,7 +240,7 @@ private fun MessageRow(
         }
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
-            Avatar(selfInitial, size = 24.dp)
+            Avatar(selfInitial, size = 24.dp, address = normalizeAddress(m.from))
         }
     }
     }

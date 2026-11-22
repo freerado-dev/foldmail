@@ -128,7 +128,7 @@ fun AccountsDrawer(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.size(width = 4.dp, height = 14.dp).clip(RoundedCornerShape(2.dp)).background(Color(a.colorArgb)))
-                    Box(Modifier.padding(start = 8.dp).size(34.dp), contentAlignment = Alignment.Center) { Avatar(a.name, size = 34.dp) }
+                    Box(Modifier.padding(start = 8.dp).size(34.dp), contentAlignment = Alignment.Center) { Avatar(a.name, size = 34.dp, address = a.email) }
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
                         Text(a.name, fontWeight = FontWeight.SemiBold)
                         Text(a.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
