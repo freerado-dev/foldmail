@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +79,8 @@ fun RichHtmlCard(
         modifier = modifier.widthIn(max = 640.dp),
     ) {
         androidx.compose.foundation.layout.Box {
-            HtmlView(html.takeIf { it.isNotBlank() }, plain, Modifier.fillMaxWidth(), inline = true)
+            // Fixed preview height: the row never changes size while the page loads (smooth scrolling); tap opens the full email.
+            HtmlView(html.takeIf { it.isNotBlank() }, plain, Modifier.fillMaxWidth().height(240.dp), inline = true)
             // Transparent layer on top: the WebView never steals scroll gestures from the chat list.
             androidx.compose.foundation.layout.Box(
                 Modifier.matchParentSize().combinedClickable(onClick = onOpen, onLongClick = onSelect),
@@ -136,6 +138,8 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = false
+                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                isNestedScrollingEnabled = true
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
                 settings.builtInZoomControls = !inline

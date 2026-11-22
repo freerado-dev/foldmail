@@ -149,8 +149,17 @@ fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long =
     val tap = Modifier.clickable(enabled = shown.uri != null || a.remoteId != null, onClick = open)
     val hasThumb = shown.uri != null && (shown.isImage || shown.isPdf)
 
+    // Images and PDFs keep the same size before and after the thumbnail loads, so the chat does not jump.
+    val bigBox = hasThumb || ((a.isImage || a.isPdf) && (local == null && a.remoteId != null && (a.sizeBytes ?: 0L) < 8_000_000L))
     Box(modifier) {
-        if (hasThumb) {
+        if (!hasThumb && bigBox) {
+            Box(
+                Modifier.then(tap).size(width = 280.dp, height = 200.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(iconFor(a), null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else if (hasThumb) {
             Thumbnail(shown, Modifier.then(tap).size(width = 280.dp, height = 200.dp).clip(RoundedCornerShape(16.dp)))
             Box(
                 Modifier.align(Alignment.BottomEnd).padding(6.dp).size(32.dp).clip(CircleShape)

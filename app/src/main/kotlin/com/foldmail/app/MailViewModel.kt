@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
@@ -111,7 +112,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     private val statusAndMessage = combine(repo.status, message, undoInfo) { s, m, u -> Triple(s, m, u) }
 
-    val state: StateFlow<MailUiState> = combine(repo.items, flags, viewState, repo.accounts, statusAndMessage) { items, f, vs, accounts, sm ->
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val state: StateFlow<MailUiState> = combine(repo.items.sample(500), flags, viewState, repo.accounts, statusAndMessage) { items, f, vs, accounts, sm ->
         val acc = vs.account
         val view = vs.view
         val allEmails: List<EmailMessage> = items.map { it.email }
