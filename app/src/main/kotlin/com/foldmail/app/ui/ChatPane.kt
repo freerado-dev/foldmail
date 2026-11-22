@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -190,7 +191,7 @@ private fun MessageRow(
                 attachments.forEach { AttachmentView(it, Modifier.padding(top = 4.dp), m.localId) }
             }
         } else {
-            Bubble(m.localId, subject, body, attachments, selected, onClick, Modifier.weight(1f, fill = false))
+            Bubble(m.localId, subject, body, attachments, selected, onOpenFull, onClick, Modifier.weight(1f, fill = false))
         }
         if (outgoing) {
             Spacer(Modifier.width(6.dp))
@@ -199,8 +200,9 @@ private fun MessageRow(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun Bubble(localId: Long, subject: String?, body: String, attachments: List<Attachment>, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Bubble(localId: Long, subject: String?, body: String, attachments: List<Attachment>, selected: Boolean, onOpen: () -> Unit, onSelect: () -> Unit, modifier: Modifier = Modifier) {
     val split = remember(body) { QuoteSplitter.split(body) }
     var showQuote by rememberSaveable(body) { mutableStateOf(false) }
 
@@ -208,7 +210,7 @@ private fun Bubble(localId: Long, subject: String?, body: String, attachments: L
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(16.dp),
-        modifier = modifier.widthIn(max = 520.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
+        modifier = modifier.widthIn(max = 520.dp).clip(RoundedCornerShape(16.dp)).combinedClickable(onClick = onOpen, onLongClick = onSelect),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
             if (!subject.isNullOrBlank()) {
