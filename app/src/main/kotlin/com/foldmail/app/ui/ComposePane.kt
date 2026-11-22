@@ -5,6 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -43,6 +47,25 @@ import com.foldmail.app.nameOf
 
 private fun splitAddresses(s: String) = s.split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }
 
+/** Rounded grey box without outline, like the message boxes in a chat. */
+@Composable
+private fun BoxField(
+    value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier,
+    placeholder: String, singleLine: Boolean = false, trailing: @Composable (() -> Unit)? = null,
+) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.TextField(
+        value, onChange, modifier,
+        placeholder = { Text(placeholder, color = c.onSurfaceVariant) },
+        singleLine = singleLine, trailingIcon = trailing,
+        shape = RoundedCornerShape(14.dp),
+        colors = androidx.compose.material3.TextFieldDefaults.colors(
+            focusedContainerColor = c.surfaceVariant, unfocusedContainerColor = c.surfaceVariant,
+            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
 /** One recipient line (To / Cc / Bcc) with suggestions from the mailbox contacts. */
 @Composable
 private fun RecipientField(
@@ -60,9 +83,9 @@ private fun RecipientField(
             .filter { typed.isEmpty() || typed in it || typed in nameOf(it, names).lowercase() }
             .take(if (typed.isEmpty()) 6 else 5).toList()
     }
-    OutlinedTextField(
+    BoxField(
         value, onChange, Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
-        label = { Text(label) }, singleLine = true, trailingIcon = trailing,
+        placeholder = label, singleLine = true, trailing = trailing,
     )
     if (suggestions.isNotEmpty()) {
         Column(Modifier.fillMaxWidth()) {
@@ -121,7 +144,7 @@ fun ComposePane(
         (body.isNotBlank() || pending.isNotEmpty())
 
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop().imePadding().navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 0.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Zavrieť") }
             Text("Nový email", Modifier.padding(start = 4.dp).weight(1f), style = MaterialTheme.typography.titleMedium)
             AttachMenuButton(actions)
@@ -132,7 +155,10 @@ fun ComposePane(
                 )
             }
         }
-        Column(Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (from != null) {
                 Box {
                     Row(
@@ -172,9 +198,10 @@ fun ComposePane(
                 RecipientField("Kópia", cc, { cc = it }, contacts, names)
                 RecipientField("Skrytá kópia", bcc, { bcc = it }, contacts, names)
             }
-            OutlinedTextField(subject, { subject = it }, Modifier.fillMaxWidth(), label = { Text("Predmet") }, singleLine = true)
+            BoxField(subject, { subject = it }, Modifier.fillMaxWidth(), placeholder = "Predmet", singleLine = true)
             PendingAttachments(pending, onRemove = { pending.remove(it) }, modifier = Modifier.padding(horizontal = 0.dp))
-            OutlinedTextField(body, { body = it }, Modifier.fillMaxWidth().weight(1f), label = { Text("Správa") })
+            BoxField(body, { body = it }, Modifier.fillMaxWidth().heightIn(min = 220.dp), placeholder = "Správa")
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

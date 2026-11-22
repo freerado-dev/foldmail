@@ -45,25 +45,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier, accounts: List<com.foldmail.app.Account> = emptyList()) {
     val context = LocalContext.current
     val settings = remember(context) { AppSettings.get(context) }
     val dark by settings.dark.collectAsState()
     val notifications by settings.notifications.collectAsState()
     val sound by settings.sound.collectAsState()
-    val sigOn by settings.signatureEnabled.collectAsState()
-    val sigText by settings.signatureText.collectAsState()
-    val sigReplies by settings.signatureOnReplies.collectAsState()
     val preview by settings.notificationPreview.collectAsState()
     val remoteImages by settings.remoteImages.collectAsState()
     val syncMinutes by settings.syncMinutes.collectAsState()
+    var sigAccount by androidx.compose.runtime.rememberSaveable { mutableStateOf(-1L) }
+    val sigId = accounts.firstOrNull { it.id == sigAccount }?.id ?: accounts.firstOrNull()?.id ?: -1L
     var photoVersion by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    val photoBitmap = remember(photoVersion) {
-        Signature.photoFile(context).takeIf { it.exists() }?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
+    var sigOn by remember(sigId) { mutableStateOf(Signature.enabled(context, sigId)) }
+    var sigText by remember(sigId) { mutableStateOf(Signature.text(context, sigId)) }
+    var sigReplies by remember(sigId) { mutableStateOf(Signature.onReplies(context, sigId)) }
+    val photoBitmap = remember(photoVersion, sigId) {
+        Signature.photoFile(context, sigId).takeIf { it.exists() }?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
     }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            if (Signature.savePhoto(context, uri)) photoVersion++
+            if (Signature.savePhoto(context, sigId, uri)) photoVersion++
             else android.widget.Toast.makeText(context, "Fotku sa nepodarilo načítať", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
@@ -87,30 +89,37 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             ChoiceRow("Tmavá téma", selected = dark) { settings.setDark(true) }
 
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
-            Header("Podpis")
-            SwitchRow("Pridávať podpis k odoslaným emailom", null, sigOn) { settings.setSignatureEnabled(it) }
-            if (sigOn) {
-                androidx.compose.material3.OutlinedTextField(
-                    sigText, { settings.setSignatureText(it) },
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    label = { Text("Text podpisu") }, minLines = 3, maxLines = 8,
-                )
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (photoBitmap != null) {
-                        androidx.compose.foundation.Image(
-                            photoBitmap.asImageBitmap(), "Fotka v podpise",
-                            Modifier.height(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                    }
-                    androidx.compose.material3.OutlinedButton(onClick = { pickPhoto.launch("image/*") }) {
-                        Text(if (photoBitmap == null) "Pridať fotku" else "Zmeniť fotku")
-                    }
-                    if (photoBitmap != null) {
-                        androidx.compose.material3.TextButton(onClick = { Signature.removePhoto(context); photoVersion++ }) { Text("Odstrániť") }
-                    }
+            Header("Podpis (pre každý účet zvlášť)")
+            if (accounts.isEmpty()) {
+                Text("Najprv pridaj emailový účet.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                accounts.forEach { acc ->
+                    ChoiceRow(acc.email + if (Signature.enabled(context, acc.id) && acc.id != sigId) "  ✓" else "", selected = acc.id == sigId) { sigAccount = acc.id }
                 }
-                SwitchRow("Podpis aj v odpovediach", "Vypni, ak chceš podpis len v nových emailoch.", sigReplies) { settings.setSignatureOnReplies(it) }
+                SwitchRow("Pridávať podpis k odoslaným emailom", null, sigOn) { sigOn = it; Signature.setEnabled(context, sigId, it) }
+                if (sigOn) {
+                    androidx.compose.material3.OutlinedTextField(
+                        sigText, { sigText = it; Signature.setText(context, sigId, it) },
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        label = { Text("Text podpisu") }, minLines = 3, maxLines = 8,
+                    )
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (photoBitmap != null) {
+                            androidx.compose.foundation.Image(
+                                photoBitmap.asImageBitmap(), "Fotka v podpise",
+                                Modifier.height(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        androidx.compose.material3.OutlinedButton(onClick = { pickPhoto.launch("image/*") }) {
+                            Text(if (photoBitmap == null) "Pridať fotku" else "Zmeniť fotku")
+                        }
+                        if (photoBitmap != null) {
+                            androidx.compose.material3.TextButton(onClick = { Signature.removePhoto(context, sigId); photoVersion++ }) { Text("Odstrániť") }
+                        }
+                    }
+                    SwitchRow("Podpis aj v odpovediach", "Vypni, ak chceš podpis len v nových emailoch.", sigReplies) { sigReplies = it; Signature.setOnReplies(context, sigId, it) }
+                }
             }
 
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)

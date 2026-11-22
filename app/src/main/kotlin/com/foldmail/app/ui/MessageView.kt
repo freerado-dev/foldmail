@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.composed
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -98,11 +99,12 @@ enum class MessageAction { Reply, ReplyAll, Forward, Delete, ShowFull }
  * start right under the camera/status bar when two apps share the screen.
  */
 @Composable
-fun Modifier.safeTop(minimum: Int = 28, cutout: Boolean = true): Modifier {
+fun Modifier.safeTop(minimum: Int = 14, cutout: Boolean = true): Modifier = composed {
     val insets = if (cutout) WindowInsets.statusBars.union(WindowInsets.displayCutout) else WindowInsets.statusBars
-    val insetTop = insets.getTop(LocalDensity.current)
-    val missing = with(LocalDensity.current) { (minimum.dp.roundToPx() - insetTop).coerceAtLeast(0).toDp() }
-    return this.windowInsetsPadding(insets).padding(top = missing)
+    val d = LocalDensity.current
+    // The system status bar is taller than its icons; give back a little of it so more of the screen is used.
+    val top = with(d) { (insets.getTop(d).toDp() - 12.dp).coerceAtLeast(minimum.dp) }
+    padding(top = top)
 }
 
 /** Samsung-style action row: Reply, Reply all, Forward, Delete and (in the chat) Full. */

@@ -49,7 +49,7 @@ class AppMailRepository(context: Context) : MailRepository {
     private fun isImap(accountId: Long) = imap.accounts.value.any { it.id == accountId }
 
     override fun send(to: List<String>, subject: String, body: String, inReplyTo: String?, attachments: List<Attachment>, accountId: Long, cc: List<String>, bcc: List<String>) {
-        val signed = if (real) Signature.apply(appContext, body, isReply = inReplyTo != null) else body
+        val signed = if (real) Signature.apply(appContext, accountId, body, isReply = inReplyTo != null) else body
         when {
             !real -> demo.send(to, subject, body, inReplyTo, attachments, accountId, cc, bcc)
             isImap(accountId) -> imap.send(to, subject, signed, inReplyTo, attachments, accountId, cc, bcc)

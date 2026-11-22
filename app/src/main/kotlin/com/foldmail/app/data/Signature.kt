@@ -14,12 +14,21 @@ object Signature {
 
     private val pending = ConcurrentHashMap<String, Html>()
 
-    fun photoFile(context: Context) = File(context.filesDir, "signature.jpg")
+    private fun prefs(context: Context) = context.getSharedPreferences("signatures", Context.MODE_PRIVATE)
 
-    fun hasPhoto(context: Context) = photoFile(context).exists()
+    fun enabled(context: Context, accountId: Long) = prefs(context).getBoolean("on_$accountId", false)
+    fun text(context: Context, accountId: Long) = prefs(context).getString("text_$accountId", "") ?: ""
+    fun onReplies(context: Context, accountId: Long) = prefs(context).getBoolean("replies_$accountId", true)
+    fun setEnabled(context: Context, accountId: Long, v: Boolean) = prefs(context).edit().putBoolean("on_$accountId", v).apply()
+    fun setText(context: Context, accountId: Long, v: String) = prefs(context).edit().putString("text_$accountId", v).apply()
+    fun setOnReplies(context: Context, accountId: Long, v: Boolean) = prefs(context).edit().putBoolean("replies_$accountId", v).apply()
+
+    fun photoFile(context: Context, accountId: Long) = File(context.filesDir, "signature_$accountId.jpg")
+
+    fun hasPhoto(context: Context, accountId: Long) = photoFile(context, accountId).exists()
 
     /** Saves the picked picture scaled down to at most 240 px (keeps the aspect ratio). */
-    fun savePhoto(context: Context, uri: Uri): Boolean = try {
+    fun savePhoto(context: Context, accountId: Long, uri: Uri): Boolean = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         var sample = 1
@@ -32,19 +41,18 @@ object Signature {
             val scaled = if (k < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true) else bmp
             val out = ByteArrayOutputStream()
             scaled.compress(Bitmap.CompressFormat.JPEG, 88, out)
-            photoFile(context).writeBytes(out.toByteArray())
+            photoFile(context, accountId).writeBytes(out.toByteArray())
             true
         }
     } catch (_: Exception) { false }
 
-    fun removePhoto(context: Context) { photoFile(context).delete() }
+    fun removePhoto(context: Context, accountId: Long) { photoFile(context, accountId).delete() }
 
     /** Body with the plain-text signature added; remembers the HTML variant (with the photo) for the sender. */
-    fun apply(context: Context, body: String, isReply: Boolean): String {
-        val s = AppSettings.get(context)
-        if (!s.signatureEnabled.value || (isReply && !s.signatureOnReplies.value)) return body
-        val text = s.signatureText.value.trim()
-        val photo = if (hasPhoto(context)) photoFile(context).readBytes() else null
+    fun apply(context: Context, accountId: Long, body: String, isReply: Boolean): String {
+        if (!enabled(context, accountId) || (isReply && !onReplies(context, accountId))) return body
+        val text = text(context, accountId).trim()
+        val photo = if (hasPhoto(context, accountId)) photoFile(context, accountId).readBytes() else null
         if (text.isEmpty() && photo == null) return body
         val full = if (text.isEmpty()) body else body.trimEnd() + "\n\n-- \n" + text
         if (photo != null) {

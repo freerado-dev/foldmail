@@ -257,7 +257,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->
             when {
-                showSettings -> SettingsScreen(onBack = { showSettings = false }, modifier = mod)
+                showSettings -> SettingsScreen(onBack = { showSettings = false }, modifier = mod, accounts = ui.accounts)
                 composing -> key(draftVersion) {
                     ComposePane(
                         initialTo = composeTo,
