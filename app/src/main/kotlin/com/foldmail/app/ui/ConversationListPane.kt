@@ -274,11 +274,13 @@ internal fun ConversationRow(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(width = 4.dp, height = 13.dp).clip(RoundedCornerShape(2.dp)).background(Color(ui.accountColor(last.accountId))))
-                    Text(title, Modifier.weight(1f, fill = false).padding(start = 5.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = titleStyle)
-                    if (c.key in ui.flags.muted) Icon(Icons.Filled.NotificationsOff, null, Modifier.padding(start = 4.dp).size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (c.key in ui.flags.priority) Icon(Icons.Filled.PriorityHigh, null, Modifier.padding(start = 2.dp).size(12.dp), tint = Color(0xFFFF3B30))
-                    Box(Modifier.weight(1f))
-                    Text(formatTimestamp(last.sentAtMillis), fontSize = 9.sp, lineHeight = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Name (and flags) take all free space, so the time is always flush right.
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(title, Modifier.weight(1f, fill = false).padding(start = 5.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = titleStyle)
+                        if (c.key in ui.flags.muted) Icon(Icons.Filled.NotificationsOff, null, Modifier.padding(start = 4.dp).size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (c.key in ui.flags.priority) Icon(Icons.Filled.PriorityHigh, null, Modifier.padding(start = 2.dp).size(12.dp), tint = Color(0xFFFF3B30))
+                    }
+                    Text(formatTimestamp(last.sentAtMillis), Modifier.padding(start = 8.dp), fontSize = 9.sp, lineHeight = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(last.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, style = subjectStyle)
                 val preview = (if (hasAttachment) "[Prílohy] " else "") +

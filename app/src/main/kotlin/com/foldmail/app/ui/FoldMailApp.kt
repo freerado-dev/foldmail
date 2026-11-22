@@ -210,7 +210,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
     }
 
-    var listWidthDp by rememberSaveable { mutableFloatStateOf(360f) }
+    var listWidthDp by rememberSaveable { mutableFloatStateOf(-1f) }
     val density = LocalDensity.current.density
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -239,6 +239,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             .openOnRightSwipe { scope.launch { drawerState.open() } },
     ) {
         val expanded = maxWidth >= ExpandedBreakpoint
+        BackHandler(enabled = search.open) { search.open = false }
 
         val listPane: @Composable (Modifier) -> Unit = { mod ->
             ConversationListPane(
@@ -311,9 +312,14 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         if (expanded) {
             // Left pane is user-resizable by dragging the divider; the right pane takes the rest.
             val maxList = (maxWidth.value - MinDetailDp).coerceAtLeast(MinListDp)
-            val leftWidth = listWidthDp.coerceIn(MinListDp, maxList)
+            // Until the user drags the divider, the list takes ~40% of the width (any fold size).
+            val leftWidth = (if (listWidthDp < 0f) (maxWidth.value * 0.4f).coerceIn(300f, 480f) else listWidthDp).coerceIn(MinListDp, maxList)
             val dragger: (Float) -> Unit = { px -> listWidthDp = (leftWidth + px / density).coerceIn(MinListDp, maxList) }
             val onTab: (MainTab) -> Unit = { tab = it; composing = false; viewingId = null; showSettings = false }
+            // Back gesture steps back (full email -> chat -> list) instead of closing the app.
+            BackHandler(enabled = showSettings || composing || viewingId != null || openKey != null) {
+                if (showSettings) showSettings = false else if (composing) composing = false else if (viewingId != null) viewingId = null else openKey = null
+            }
             if (tab == MainTab.Calendar) {
                 Column(Modifier.fillMaxSize()) {
                     calendar(Modifier.weight(1f).fillMaxWidth())
