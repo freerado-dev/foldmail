@@ -183,16 +183,24 @@ class ImapRepository private constructor(private val context: Context) {
         try { runSync(FETCH_PER_SYNC) } finally { syncMutex.unlock() }
     }
 
+    @Volatile private var retries = 0
+
     private suspend fun runSync(maxFetch: Int) {
         status.value = SyncStatus(syncing = true)
         val errors = ArrayList<String>()
+        var offline = false
         for (account in accounts.value) {
             try {
                 syncAccount(account, maxFetch)
             } catch (e: Exception) {
-                errors += "${account.email}: ${e.message ?: e.javaClass.simpleName}"
+                // No network yet (e.g. right after opening the app): no red banner, try again shortly.
+                if (isNetworkError(e)) offline = true else errors += "${account.email}: ${e.message ?: e.javaClass.simpleName}"
             }
         }
+        if (offline && retries < 4) {
+            retries++
+            scope.launch { kotlinx.coroutines.delay(4_000L * retries); sync() }
+        } else if (!offline) retries = 0
         if (errors.isEmpty() || cache.isNotEmpty()) publish()
         status.value = SyncStatus(false, errors.firstOrNull())
     }
