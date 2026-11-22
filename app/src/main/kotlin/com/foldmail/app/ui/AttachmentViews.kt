@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.width
@@ -442,7 +443,7 @@ private fun ZoomableImage(a: Attachment?) {
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     Box(
         Modifier.fillMaxSize().pointerInput(Unit) {
-            androidx.compose.foundation.gestures.awaitEachGesture {
+            awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 do {
                     val ev = awaitPointerEvent()

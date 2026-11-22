@@ -116,8 +116,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeCloseSignal by remember { mutableStateOf(0) }
     var showDrafts by rememberSaveable { mutableStateOf(false) }
     var gallery by remember { mutableStateOf<GalleryRequest?>(null) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { com.foldmail.app.data.DraftStore.load(context) }
-    val drafts by com.foldmail.app.data.DraftStore.drafts.collectAsState()
+    val draftCtx = LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) { com.foldmail.app.data.DraftStore.load(draftCtx) }
+    val drafts by com.foldmail.app.data.DraftStore.drafts.collectAsStateWithLifecycle()
     val search = remember { SearchState() }
     val chatsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val groupsListState = androidx.compose.foundation.lazy.rememberLazyListState()
