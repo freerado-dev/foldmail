@@ -184,6 +184,35 @@ fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long =
     }
 }
 
+/** Small square attachment tile (thumbnail or file icon) for the one-line strip under a message preview. */
+@Composable
+fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val fetcher = LocalAttachmentFetcher.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var local by remember(a) { mutableStateOf(if (a.uri != null) a else null) }
+    androidx.compose.runtime.LaunchedEffect(a) {
+        if (local == null && a.remoteId != null && (a.isImage || a.isPdf) && (a.sizeBytes ?: 0L) < 8_000_000L) {
+            local = try { fetcher(localId, a) } catch (_: Exception) { null }
+        }
+    }
+    val shown = local ?: a
+    val hasThumb = shown.uri != null && (shown.isImage || shown.isPdf)
+    Box(
+        modifier.size(46.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).clickable {
+            scope.launch {
+                val r = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }
+                if (r != null) { local = r; openAttachment(context, r) }
+                else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (hasThumb) Thumbnail(shown, Modifier.fillMaxSize())
+        else Icon(iconFor(a), contentDescription = a.name, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 /** Compact attachment line with a small thumbnail, used in search results. */
 @Composable
 fun AttachmentRow(a: Attachment, localId: Long, modifier: Modifier = Modifier) {

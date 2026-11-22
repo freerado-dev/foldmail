@@ -96,10 +96,11 @@ enum class MessageAction { Reply, ReplyAll, Forward, Delete, ShowFull }
  * start right under the camera/status bar when two apps share the screen.
  */
 @Composable
-fun Modifier.safeTop(minimum: Int = 28): Modifier {
-    val insetTop = WindowInsets.statusBars.union(WindowInsets.displayCutout).getTop(LocalDensity.current)
+fun Modifier.safeTop(minimum: Int = 28, cutout: Boolean = true): Modifier {
+    val insets = if (cutout) WindowInsets.statusBars.union(WindowInsets.displayCutout) else WindowInsets.statusBars
+    val insetTop = insets.getTop(LocalDensity.current)
     val missing = with(LocalDensity.current) { (minimum.dp.roundToPx() - insetTop).coerceAtLeast(0).toDp() }
-    return this.windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout)).padding(top = missing)
+    return this.windowInsetsPadding(insets).padding(top = missing)
 }
 
 /** Samsung-style action row: Reply, Reply all, Forward, Delete and (in the chat) Full. */
