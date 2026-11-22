@@ -11,6 +11,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
@@ -121,7 +128,8 @@ fun PendingAttachments(items: List<Attachment>, onRemove: (Attachment) -> Unit, 
 
 /** Attachment as shown inside a message: thumbnail (images, PDF first page), tap = open, arrow = save to Downloads. */
 @Composable
-fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long = 0L) {
+fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long = 0L, siblings: List<Attachment> = emptyList()) {
+    val gallery = LocalImageGallery.current
     val context = LocalContext.current
     val fetcher = LocalAttachmentFetcher.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -138,7 +146,8 @@ fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long =
     fun toast(t: String) = android.widget.Toast.makeText(context, t, android.widget.Toast.LENGTH_SHORT).show()
 
     val open: () -> Unit = {
-        scope.launch {
+        if (a.isImage && a in siblings) { val imgs = siblings.filter { it.isImage }; gallery(localId, imgs, imgs.indexOf(a)) }
+        else scope.launch {
             if (shown.uri == null) toast("Sťahujem ${a.name}…")
             val r = ensure()
             if (r != null) openAttachment(context, r) else toast("Prílohu sa nepodarilo stiahnuť")
@@ -190,7 +199,8 @@ fun AttachmentView(a: Attachment, modifier: Modifier = Modifier, localId: Long =
 
 /** Small square attachment tile (thumbnail or file icon) for the one-line strip under a message preview. */
 @Composable
-fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier) {
+fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier, siblings: List<Attachment> = emptyList()) {
+    val gallery = LocalImageGallery.current
     val context = LocalContext.current
     val fetcher = LocalAttachmentFetcher.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -204,6 +214,7 @@ fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier) 
     val hasThumb = shown.uri != null && (shown.isImage || shown.isPdf)
     Box(
         modifier.size(46.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).clickable {
+            if (a.isImage && a in siblings) { val imgs = siblings.filter { it.isImage }; gallery(localId, imgs, imgs.indexOf(a)); return@clickable }
             scope.launch {
                 val r = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }
                 if (r != null) { local = r; openAttachment(context, r) }
@@ -219,7 +230,8 @@ fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier) 
 
 /** Attachment tile that keeps the original aspect ratio (no cropping); height fixed, width follows the picture. */
 @Composable
-fun AttachmentTile(a: Attachment, localId: Long, height: androidx.compose.ui.unit.Dp = 90.dp) {
+fun AttachmentTile(a: Attachment, localId: Long, height: androidx.compose.ui.unit.Dp = 90.dp, siblings: List<Attachment> = emptyList()) {
+    val gallery = LocalImageGallery.current
     val context = LocalContext.current
     val fetcher = LocalAttachmentFetcher.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -237,7 +249,8 @@ fun AttachmentTile(a: Attachment, localId: Long, height: androidx.compose.ui.uni
         }
     }
     val open = {
-        scope.launch {
+        if (a.isImage && a in siblings) { val imgs = siblings.filter { it.isImage }; gallery(localId, imgs, imgs.indexOf(a)) }
+        else scope.launch {
             val r = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }
             if (r != null) { local = r; openAttachment(context, r) }
             else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_SHORT).show()
@@ -366,5 +379,89 @@ private fun openAttachment(context: Context, a: Attachment) {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     } catch (_: Exception) {
+    }
+}
+
+/** Opens the gallery: attachment owner, the images and the index to start at. */
+val LocalImageGallery = androidx.compose.runtime.staticCompositionLocalOf<(Long, List<Attachment>, Int) -> Unit> { { _, _, _ -> } }
+
+class GalleryRequest(val localId: Long, val images: List<Attachment>, val start: Int)
+
+/** Full-screen popup with all images of a message: swipe between them, pinch to zoom, save to Downloads. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun ImageGallery(req: GalleryRequest, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val fetcher = LocalAttachmentFetcher.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = req.start.coerceIn(0, req.images.lastIndex)) { req.images.size }
+    val loaded = remember { androidx.compose.runtime.mutableStateMapOf<Int, Attachment>() }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onClose,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            androidx.compose.foundation.pager.HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
+                val a = req.images[page]
+                androidx.compose.runtime.LaunchedEffect(page) {
+                    if (a.uri != null) loaded[page] = a
+                    else try { fetcher(req.localId, a)?.let { loaded[page] = it } } catch (_: Exception) { }
+                }
+                ZoomableImage(loaded[page])
+            }
+            Row(
+                Modifier.fillMaxWidth().align(Alignment.TopStart).background(Color(0x66000000)).statusBarsPadding().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Zavrieť", tint = Color.White) }
+                Text(
+                    req.images[pager.currentPage].name, Modifier.weight(1f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("${pager.currentPage + 1} / ${req.images.size}", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                IconButton(onClick = {
+                    scope.launch {
+                        val r = loaded[pager.currentPage]
+                        val ok = r != null && saveToDownloads(context, r)
+                        android.widget.Toast.makeText(context, if (ok) "Uložené do Stiahnuté: ${r!!.name}" else "Uloženie zlyhalo", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }) { Icon(Icons.Filled.Download, "Stiahnuť", tint = Color.White) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZoomableImage(a: Attachment?) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(null, a?.uri) {
+        value = a?.uri?.let { u -> withContext(Dispatchers.IO) { decodeSampled(context, Uri.parse(u), 2048) } }
+    }
+    val bmp = bitmap
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            androidx.compose.foundation.gestures.awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                do {
+                    val ev = awaitPointerEvent()
+                    if (ev.changes.size > 1 || scale > 1f) {
+                        scale = (scale * ev.calculateZoom()).coerceIn(1f, 5f)
+                        offset = if (scale > 1f) offset + ev.calculatePan() else androidx.compose.ui.geometry.Offset.Zero
+                        ev.changes.forEach { if (it.positionChanged()) it.consume() }
+                    }
+                } while (ev.changes.any { it.pressed })
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bmp == null) androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+        else Image(
+            bmp.asImageBitmap(), a?.name, Modifier.fillMaxSize().graphicsLayer {
+                scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
+            },
+            contentScale = ContentScale.Fit,
+        )
     }
 }

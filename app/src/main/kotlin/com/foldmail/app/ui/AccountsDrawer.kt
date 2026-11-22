@@ -61,6 +61,7 @@ fun AccountsDrawer(
     onOpenSettings: () -> Unit = {},
     onAddImap: () -> Unit = {},
     onRemoveAccount: (Long) -> Unit = {},
+    onOpenDrafts: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
@@ -110,7 +111,7 @@ fun AccountsDrawer(
                 DrawerItem(Icons.Filled.Archive, "Archív") { onView(ListView.Archived) }
                 DrawerItem(Icons.Filled.Delete, "Kôš") { onView(ListView.Trash) }
                 DrawerItem(Icons.Filled.Schedule, "Naplánované", soon = true) { soon() }
-                DrawerItem(Icons.Filled.Edit, "Koncepty", soon = true) { soon() }
+                DrawerItem(Icons.Filled.Edit, "Koncepty") { onOpenDrafts() }
                 DrawerItem(if (showFolders) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, if (showFolders) "Skryť priečinky" else "Zobraziť priečinky") {
                     showFolders = !showFolders
                 }

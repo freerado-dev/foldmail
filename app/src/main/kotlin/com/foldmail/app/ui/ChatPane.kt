@@ -228,7 +228,7 @@ private fun MessageRow(
                         Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(top = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        attachments.forEach { AttachmentMini(it, m.localId) }
+                        attachments.forEach { AttachmentMini(it, m.localId, siblings = attachments) }
                     }
                 }
             }

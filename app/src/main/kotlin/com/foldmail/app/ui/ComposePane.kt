@@ -121,13 +121,19 @@ fun ComposePane(
     names: Map<String, String> = emptyMap(),
     accounts: List<com.foldmail.app.Account> = emptyList(),
     initialAccountId: Long = -1L,
+    initialBcc: String = "",
+    draftId: String? = null,
+    initialReplyTo: String? = null,
+    closeSignal: Int = 0,
+    onSaveDraft: (com.foldmail.app.data.Draft) -> Unit = {},
+    onDiscard: () -> Unit = {},
     onClose: () -> Unit,
     onSend: (to: List<String>, subject: String, body: String, attachments: List<Attachment>, cc: List<String>, bcc: List<String>, accountId: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var to by rememberSaveable(initialTo) { mutableStateOf(initialTo) }
     var cc by rememberSaveable { mutableStateOf(initialCc) }
-    var bcc by rememberSaveable { mutableStateOf("") }
+    var bcc by rememberSaveable { mutableStateOf(initialBcc) }
     var accountId by rememberSaveable { mutableStateOf(initialAccountId) }
     var pickAccount by remember { mutableStateOf(false) }
     val from = accounts.firstOrNull { it.id == accountId } ?: accounts.firstOrNull()
@@ -143,9 +149,36 @@ fun ComposePane(
     val canSend = recipients.isNotEmpty() && (recipients + ccList + bccList).all { '@' in it } &&
         (body.isNotBlank() || pending.isNotEmpty())
 
+    var confirmClose by remember { mutableStateOf(false) }
+    val startSignal = remember { closeSignal }
+    val hasContent = to.isNotBlank() || cc.isNotBlank() || subject.isNotBlank() || body.isNotBlank() || pending.isNotEmpty()
+    val requestClose = { if (hasContent) confirmClose = true else { onDiscard(); onClose() } }
+    androidx.compose.runtime.LaunchedEffect(closeSignal) { if (closeSignal != startSignal) requestClose() }
+    if (confirmClose) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmClose = false },
+            title = { Text("Zavrieť rozpísaný email?") },
+            text = { Text("Môžeš si ho uložiť medzi koncepty a dokončiť neskôr." + if (pending.isNotEmpty()) " Prílohy sa do konceptu neukladajú." else "") },
+            confirmButton = {
+                Row {
+                    androidx.compose.material3.TextButton(onClick = { confirmClose = false; onDiscard(); onClose() }) { Text("Zahodiť") }
+                    androidx.compose.material3.Button(onClick = {
+                        onSaveDraft(
+                            com.foldmail.app.data.Draft(
+                                draftId ?: java.util.UUID.randomUUID().toString(), to, cc, bcc, subject, body,
+                                from?.id ?: accountId, initialReplyTo, System.currentTimeMillis(),
+                            ),
+                        )
+                        confirmClose = false; onClose()
+                    }) { Text("Uložiť koncept") }
+                }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmClose = false }) { Text("Späť") } },
+        )
+    }
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop().imePadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 0.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Zavrieť") }
+            IconButton(onClick = { requestClose() }) { Icon(Icons.Filled.Close, contentDescription = "Zavrieť") }
             Text("Nový email", Modifier.padding(start = 4.dp).weight(1f), style = MaterialTheme.typography.titleMedium)
             AttachMenuButton(actions)
             IconButton(enabled = canSend, onClick = { onSend(recipients, subject.trim(), body.trim(), pending.toList(), ccList, bccList, from?.id ?: accountId) }) {

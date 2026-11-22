@@ -239,7 +239,7 @@ fun MessageViewPane(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) { files.forEach { AttachmentTile(it, message.localId) } }
+                ) { files.forEach { AttachmentTile(it, message.localId, siblings = files) } }
             }
         }
         MessageActionBar(onAction, Modifier.navigationBarsPadding(), showFullEntry = false)

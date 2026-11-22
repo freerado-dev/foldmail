@@ -111,6 +111,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeAccount by rememberSaveable { mutableStateOf(-1L) }
     var composeFiles by remember { mutableStateOf(emptyList<Attachment>()) }
     var draftVersion by rememberSaveable { mutableStateOf(0) }
+    var composeBcc by rememberSaveable { mutableStateOf("") }
+    var composeDraftId by rememberSaveable { mutableStateOf<String?>(null) }
+    var composeCloseSignal by remember { mutableStateOf(0) }
+    var showDrafts by rememberSaveable { mutableStateOf(false) }
+    var gallery by remember { mutableStateOf<GalleryRequest?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { com.foldmail.app.data.DraftStore.load(context) }
+    val drafts by com.foldmail.app.data.DraftStore.drafts.collectAsState()
     val search = remember { SearchState() }
     val chatsListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val groupsListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -172,13 +179,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     LaunchedEffect(ui.message) {
         ui.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); vm.consumeMessage() }
     }
-    fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; showSettings = false; scope.launch { drawerState.close() } }
+    fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; showSettings = false; showDrafts = false; scope.launch { drawerState.close() } }
 
     fun startCompose(to: String = "") {
-        composeTo = to; composeSubject = ""; composeBody = ""; composeCc = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList()
-        draftVersion++; composing = true; showSettings = false; tab = MainTab.Chats
+        composeTo = to; composeSubject = ""; composeBody = ""; composeCc = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList(); composeBcc = ""; composeDraftId = null
+        draftVersion++; composing = true; showSettings = false; showDrafts = false; tab = MainTab.Chats
     }
-    fun openChat(key: String) { openKey = key; composing = false; showSettings = false; viewingId = null; tab = MainTab.Chats }
+    fun openChat(key: String) { openKey = key; composing = false; showSettings = false; showDrafts = false; viewingId = null; tab = MainTab.Chats }
     fun onMessageAction(a: MessageAction, m: EmailMessage) {
         val body = ui.bodies[m.localId].orEmpty()
         when (a) {
@@ -187,13 +194,13 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 composeCc = ""
                 composeSubject = prefixSubject(m.subject, "Re: ")
                 composeBody = quoteForReply(m, body, ui.names)
-                composeReplyTo = m.messageId; composeAccount = m.accountId; composeFiles = emptyList()
+                composeReplyTo = m.messageId; composeAccount = m.accountId; composeFiles = emptyList(); composeBcc = ""; composeDraftId = null
                 draftVersion++; composing = true; viewingId = null; tab = MainTab.Chats
             }
             MessageAction.Forward -> {
                 composeTo = ""; composeCc = ""; composeSubject = prefixSubject(m.subject, "Fwd: ")
                 composeBody = forwardBody(m, body)
-                composeReplyTo = null; composeAccount = m.accountId
+                composeReplyTo = null; composeAccount = m.accountId; composeBcc = ""; composeDraftId = null
                 val atts = ui.attachments[m.localId].orEmpty()
                 scope.launch {
                     if (atts.isNotEmpty()) Toast.makeText(context, "Pripravujem prílohy…", Toast.LENGTH_SHORT).show()
@@ -216,7 +223,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAttachmentFetcher provides { id: Long, a: Attachment -> vm.fetchAttachment(id, a) },
         LocalHtmlResolver provides { id: Long -> vm.resolveHtml(id) },
+        LocalImageGallery provides { id: Long, list: List<Attachment>, i: Int -> gallery = GalleryRequest(id, list, i) },
     ) {
+    gallery?.let { g -> ImageGallery(g, onClose = { gallery = null }) }
     ModalNavigationDrawer(
         drawerState = drawerState,
         // Closed: our own detector opens it (so rows can use horizontal drags); open: the drawer handles closing swipes.
@@ -230,7 +239,8 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 onSync = { vm.refresh(); scope.launch { drawerState.close() } },
                 onRemoveAccount = vm::removeAccount,
                 onAddImap = { showImap = true; scope.launch { drawerState.close() } },
-                onOpenSettings = { showSettings = true; composing = false; tab = MainTab.Chats; scope.launch { drawerState.close() } },
+                onOpenDrafts = { showDrafts = true; showSettings = false; composing = false; viewingId = null; tab = MainTab.Chats; scope.launch { drawerState.close() } },
+                onOpenSettings = { showSettings = true; showDrafts = false; composing = false; tab = MainTab.Chats; scope.launch { drawerState.close() } },
             )
         },
     ) {
@@ -257,6 +267,17 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
         val detailPane: @Composable (Modifier) -> Unit = { mod ->
             when {
+                showDrafts -> DraftsScreen(
+                    drafts = drafts,
+                    onBack = { showDrafts = false },
+                    onDelete = { com.foldmail.app.data.DraftStore.delete(context, it.id) },
+                    onOpen = { d ->
+                        composeTo = d.to; composeCc = d.cc; composeBcc = d.bcc; composeSubject = d.subject; composeBody = d.body
+                        composeReplyTo = d.replyTo; composeAccount = d.accountId; composeFiles = emptyList(); composeDraftId = d.id
+                        draftVersion++; composing = true; showDrafts = false
+                    },
+                    modifier = mod,
+                )
                 showSettings -> SettingsScreen(onBack = { showSettings = false }, modifier = mod, accounts = ui.accounts)
                 composing -> key(draftVersion) {
                     ComposePane(
@@ -265,6 +286,12 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         initialBody = composeBody,
                         initialCc = composeCc,
                         initialAttachments = composeFiles,
+                        initialBcc = composeBcc,
+                        draftId = composeDraftId,
+                        initialReplyTo = composeReplyTo,
+                        closeSignal = composeCloseSignal,
+                        onSaveDraft = { com.foldmail.app.data.DraftStore.save(context, it); Toast.makeText(context, "Koncept uložený", Toast.LENGTH_SHORT).show() },
+                        onDiscard = { com.foldmail.app.data.DraftStore.delete(context, composeDraftId) },
                         contacts = ui.contacts,
                         accounts = ui.accounts,
                         initialAccountId = composeAccount.takeIf { it >= 0 } ?: ui.selectedAccount ?: ui.accounts.firstOrNull()?.id ?: -1L,
@@ -272,6 +299,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                         onClose = { composing = false },
                         onSend = { to, subject, body, files, cc, bcc, accountId ->
                             vm.send(to, subject, body, composeReplyTo, files, accountId.takeIf { it >= 0 } ?: composeAccount.takeIf { it >= 0 }, cc, bcc)
+                            com.foldmail.app.data.DraftStore.delete(context, composeDraftId)
                             composing = false
                         },
                         modifier = mod,
@@ -315,10 +343,10 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             // Until the user drags the divider, the list takes ~40% of the width (any fold size).
             val leftWidth = (if (listWidthDp < 0f) (maxWidth.value * 0.4f).coerceIn(300f, 480f) else listWidthDp).coerceIn(MinListDp, maxList)
             val dragger: (Float) -> Unit = { px -> listWidthDp = (leftWidth + px / density).coerceIn(MinListDp, maxList) }
-            val onTab: (MainTab) -> Unit = { tab = it; composing = false; viewingId = null; showSettings = false }
+            val onTab: (MainTab) -> Unit = { tab = it; composing = false; viewingId = null; showSettings = false; showDrafts = false }
             // Back gesture steps back (full email -> chat -> list) instead of closing the app.
-            BackHandler(enabled = showSettings || composing || viewingId != null || openKey != null) {
-                if (showSettings) showSettings = false else if (composing) composing = false else if (viewingId != null) viewingId = null else openKey = null
+            BackHandler(enabled = showSettings || showDrafts || composing || viewingId != null || openKey != null) {
+                if (showSettings) showSettings = false else if (showDrafts) showDrafts = false else if (composing) composeCloseSignal++ else if (viewingId != null) viewingId = null else openKey = null
             }
             if (tab == MainTab.Calendar) {
                 Column(Modifier.fillMaxSize()) {
@@ -339,9 +367,9 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                 }
             }
         } else {
-            val fullScreen = showSettings || composing || (tab.isChatList && open != null)
+            val fullScreen = showSettings || showDrafts || composing || (tab.isChatList && open != null)
             BackHandler(enabled = fullScreen) {
-                if (showSettings) showSettings = false else if (composing) composing = false else if (viewingId != null) viewingId = null else openKey = null
+                if (showSettings) showSettings = false else if (showDrafts) showDrafts = false else if (composing) composeCloseSignal++ else if (viewingId != null) viewingId = null else openKey = null
             }
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
