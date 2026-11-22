@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +79,10 @@ fun ChatPane(
         conversation.threads.flatMapIndexed { i, g -> g.messages.map { it.localId to i } }.toMap()
     }
     val listState = rememberLazyListState()
+    // Measured heights of rows already seen: when a row scrolls back into view it gets its old height
+    // at once, so older messages no longer make the list jump while their content loads.
+    val heights = remember(conversation.key) { HashMap<Long, Int>() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     LaunchedEffect(conversation.key, conversation.unreadCount) { onOpened() }
     LaunchedEffect(conversation.key, messages.size) {
@@ -109,7 +115,16 @@ fun ChatPane(
         ) {
             itemsIndexed(messages, key = { _, m -> m.localId }) { index, m ->
                 val prev = messages.getOrNull(index - 1)
-                Column(Modifier.fillMaxWidth()) {
+                val known = heights[m.localId]
+                val reserve = when {
+                    known != null -> with(density) { known.toDp() }
+                    m.localId in ui.richIds -> 260.dp
+                    else -> 0.dp
+                }
+                Column(
+                    Modifier.fillMaxWidth().heightIn(min = reserve)
+                        .onSizeChanged { if (it.height > 0) heights[m.localId] = it.height },
+                ) {
                     if (prev == null || m.sentAtMillis - prev.sentAtMillis > STAMP_GAP_MS) {
                         Text(
                             formatChatStamp(m.sentAtMillis),

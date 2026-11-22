@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -190,6 +192,18 @@ fun MessageViewPane(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         HtmlView(html, ui.bodies[message.localId].orEmpty(), Modifier.weight(1f).fillMaxWidth())
+        val files = ui.attachments[message.localId].orEmpty()
+        if (files.isNotEmpty()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 260.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                files.forEach { AttachmentView(it, Modifier, message.localId) }
+            }
+        }
         MessageActionBar(onAction, Modifier.navigationBarsPadding(), showFullEntry = false)
     }
 }
