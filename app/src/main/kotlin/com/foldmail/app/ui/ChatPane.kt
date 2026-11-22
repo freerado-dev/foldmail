@@ -68,6 +68,7 @@ private const val STAMP_GAP_MS = 60 * 60 * 1000L
 
 @Composable
 fun ChatPane(
+    state: ChatScrollState,
     conversation: PersonConversation,
     ui: MailUiState,
     onBack: (() -> Unit)?,
@@ -83,15 +84,19 @@ fun ChatPane(
     val threadOf = remember(conversation) {
         conversation.threads.flatMapIndexed { i, g -> g.messages.map { it.localId to i } }.toMap()
     }
-    val listState = rememberLazyListState()
+    val listState = state.listStates.getOrPut(conversation.key) { androidx.compose.foundation.lazy.LazyListState() }
     // Measured heights of rows already seen: when a row scrolls back into view it gets its old height
     // at once, so older messages no longer make the list jump while their content loads.
-    val heights = remember(conversation.key) { HashMap<Long, Int>() }
+    val heights = state.heights.getOrPut(conversation.key) { HashMap<Long, Int>() }
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     LaunchedEffect(conversation.key, conversation.unreadCount) { onOpened() }
     LaunchedEffect(conversation.key, messages.size) {
-        if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
+        // Jump to the newest message only when the chat is first opened or gets new mail; coming back from a full email keeps the position.
+        if (messages.isNotEmpty() && state.seenCounts[conversation.key] != messages.size) {
+            state.seenCounts[conversation.key] = messages.size
+            listState.scrollToItem(messages.size - 1)
+        }
     }
 
     Column(modifier.background(MaterialTheme.colorScheme.background).safeTop(minimum = 4, cutout = false).imePadding()) {
@@ -320,4 +325,11 @@ fun EmptyDetailPane(modifier: Modifier = Modifier) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
         Text("Vyberte chat", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
     }
+}
+
+/** Scroll positions and measured row heights of the chats, kept while a chat is replaced by a full email. */
+class ChatScrollState {
+    val listStates = HashMap<String, androidx.compose.foundation.lazy.LazyListState>()
+    val heights = HashMap<String, HashMap<Long, Int>>()
+    val seenCounts = HashMap<String, Int>()
 }

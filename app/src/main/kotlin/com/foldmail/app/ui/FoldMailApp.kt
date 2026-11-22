@@ -115,6 +115,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     var composeDraftId by rememberSaveable { mutableStateOf<String?>(null) }
     var composeCloseSignal by remember { mutableStateOf(0) }
     var showDrafts by rememberSaveable { mutableStateOf(false) }
+    val chatScroll = remember { ChatScrollState() }
     var gallery by remember { mutableStateOf<GalleryRequest?>(null) }
     val draftCtx = LocalContext.current
     androidx.compose.runtime.LaunchedEffect(Unit) { com.foldmail.app.data.DraftStore.load(draftCtx) }
@@ -314,6 +315,7 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
                     modifier = mod,
                 )
                 open != null -> ChatPane(
+                    state = chatScroll,
                     conversation = open,
                     ui = ui,
                     onBack = if (expanded) null else ({ openKey = null }),
