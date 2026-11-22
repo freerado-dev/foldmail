@@ -138,8 +138,10 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = false
-                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                isNestedScrollingEnabled = true
+                // Default (window) acceleration: a forced hardware layer makes tall pages re-render when scrolling back up.
+                isNestedScrollingEnabled = false
+                isVerticalScrollBarEnabled = true
+                overScrollMode = android.view.View.OVER_SCROLL_NEVER
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
                 settings.builtInZoomControls = !inline
