@@ -124,7 +124,7 @@ fun isRichHtml(html: String?): Boolean =
     html != null && Regex("<img|<table|background", RegexOption.IGNORE_CASE).containsMatchIn(html)
 
 /** Full HTML document for the message viewer (readable on a phone, images fit the width). */
-fun wrapHtml(html: String?, plain: String): String {
+fun wrapHtml(html: String?, plain: String, bottomPadDp: Int = 0): String {
     val inner = html?.takeIf { it.isNotBlank() } ?: run {
         val esc = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         "<pre style=\"white-space:pre-wrap;font-family:sans-serif;margin:0\">$esc</pre>"
@@ -136,7 +136,7 @@ fun wrapHtml(html: String?, plain: String): String {
         // Newsletters: no animations, fixed backgrounds or effects that force a repaint on every scroll step.
         "*{animation:none!important;transition:none!important;background-attachment:scroll!important;" +
         "box-shadow:none!important;text-shadow:none!important;filter:none!important;backdrop-filter:none!important}" +
-        "</style></head><body>${inner.replace(Regex("<img\\b", RegexOption.IGNORE_CASE), "<img decoding=\"async\"")}</body></html>"
+        "</style></head><body>${inner.replace(Regex("<img\\b", RegexOption.IGNORE_CASE), "<img decoding=\"async\"")}${if (bottomPadDp > 0) "<div style=\"height:${bottomPadDp}px\"></div>" else ""}</body></html>"
 }
 
 /** One entry of the "later" part of the More menu. */

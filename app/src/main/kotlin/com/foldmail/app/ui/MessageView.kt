@@ -132,8 +132,8 @@ private fun ActionItem(icon: ImageVector, label: String, modifier: Modifier, onC
 /** Renders the email as HTML (like a mail client) – falls back to the plain text. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline: Boolean = false) {
-    val page = remember(html, plain) { wrapHtml(html, plain) }
+fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline: Boolean = false, bottomPadDp: Int = 0, onBottom: ((Boolean) -> Unit)? = null) {
+    val page = remember(html, plain, bottomPadDp) { wrapHtml(html, plain, bottomPadDp) }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -152,7 +152,13 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
                 settings.displayZoomControls = false
                 settings.allowFileAccess = false
                 setBackgroundColor(android.graphics.Color.WHITE)
+                if (onBottom != null) {
+                    fun check(v: WebView) { onBottom(v.contentHeight * v.scale <= v.height + v.scrollY + 24f) }
+                    setOnScrollChangeListener { v, _, _, _, _ -> check(v as WebView) }
+                    setOnTouchListener { v, _ -> v.post { check(v as WebView) }; false }
+                }
                 webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String?) { onBottom?.invoke(view.contentHeight * view.scale <= view.height + view.scrollY + 24f) }
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? =
                         ImageShrinker.intercept(request)
 
@@ -211,17 +217,21 @@ fun MessageViewPane(
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        HtmlView(html, ui.bodies[message.localId].orEmpty(), Modifier.weight(1f).fillMaxWidth())
         val files = ui.attachments[message.localId].orEmpty()
-        if (files.isNotEmpty()) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Column(
-                Modifier.fillMaxWidth().heightIn(max = 260.dp)
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                files.forEach { AttachmentView(it, Modifier, message.localId) }
+        var atBottom by remember(message.localId) { mutableStateOf(false) }
+        val panelDp = if (files.isEmpty()) 0 else minOf(230, 24 + 104 * ((files.size + 2) / 3))
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            HtmlView(html, ui.bodies[message.localId].orEmpty(), Modifier.fillMaxSize(), bottomPadDp = panelDp, onBottom = { atBottom = it })
+            if (files.isNotEmpty() && atBottom) {
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.FlowRow(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth().heightIn(max = panelDp.dp)
+                        .background(MaterialTheme.colorScheme.background)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) { files.forEach { AttachmentTile(it, message.localId) } }
             }
         }
         MessageActionBar(onAction, Modifier.navigationBarsPadding(), showFullEntry = false)

@@ -11,6 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -210,6 +214,49 @@ fun AttachmentMini(a: Attachment, localId: Long, modifier: Modifier = Modifier) 
     ) {
         if (hasThumb) Thumbnail(shown, Modifier.fillMaxSize())
         else Icon(iconFor(a), contentDescription = a.name, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Attachment tile that keeps the original aspect ratio (no cropping); height fixed, width follows the picture. */
+@Composable
+fun AttachmentTile(a: Attachment, localId: Long, height: androidx.compose.ui.unit.Dp = 90.dp) {
+    val context = LocalContext.current
+    val fetcher = LocalAttachmentFetcher.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var local by remember(a) { mutableStateOf(if (a.uri != null) a else null) }
+    androidx.compose.runtime.LaunchedEffect(a) {
+        if (local == null && a.remoteId != null && (a.isImage || a.isPdf) && (a.sizeBytes ?: 0L) < 8_000_000L) {
+            local = try { fetcher(localId, a) } catch (_: Exception) { null }
+        }
+    }
+    val shown = local ?: a
+    val bitmap by produceState<Bitmap?>(null, shown.uri) {
+        val u = shown.uri
+        value = if (u == null || !(shown.isImage || shown.isPdf)) null else withContext(Dispatchers.IO) {
+            if (shown.isPdf) renderPdf(context, Uri.parse(u), 320) else decodeSampled(context, Uri.parse(u), 320)
+        }
+    }
+    val open = {
+        scope.launch {
+            val r = shown.takeIf { it.uri != null } ?: try { fetcher(localId, a) } catch (_: Exception) { null }
+            if (r != null) { local = r; openAttachment(context, r) }
+            else android.widget.Toast.makeText(context, "Prílohu sa nepodarilo stiahnuť", android.widget.Toast.LENGTH_SHORT).show()
+        }
+        Unit
+    }
+    val bmp = bitmap
+    if (bmp != null) {
+        Image(bmp.asImageBitmap(), a.name, Modifier.height(height).clip(RoundedCornerShape(6.dp)).clickable { open() }, contentScale = ContentScale.Fit)
+    } else {
+        Row(
+            Modifier.height(height.coerceAtMost(56.dp)).widthIn(max = 150.dp).clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant).clickable { open() }.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(iconFor(a), contentDescription = null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(6.dp))
+            Text(a.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 

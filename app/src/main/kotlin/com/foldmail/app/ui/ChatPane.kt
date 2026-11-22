@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -185,9 +186,9 @@ private fun MessageRow(
     val outgoing = m.isOutgoing
     val preview = remember(body) { QuoteSplitter.split(body).fresh.trim().ifEmpty { body.trim() } }
     val shape = RoundedCornerShape(14.dp)
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = if (outgoing) Alignment.TopEnd else Alignment.TopStart) {
     Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
+        Modifier.widthIn(max = maxWidth * 0.84f),
         verticalAlignment = Alignment.Top,
     ) {
         if (!outgoing) {
@@ -203,7 +204,7 @@ private fun MessageRow(
             },
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = shape,
-            modifier = Modifier.weight(1f, fill = false).widthIn(max = 560.dp).clip(shape)
+            modifier = Modifier.weight(1f, fill = false).clip(shape)
                 .combinedClickable(onClick = onOpenFull, onLongClick = onClick),
         ) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -236,6 +237,7 @@ private fun MessageRow(
             Spacer(Modifier.width(6.dp))
             Avatar(selfInitial, size = 24.dp)
         }
+    }
     }
 }
 
