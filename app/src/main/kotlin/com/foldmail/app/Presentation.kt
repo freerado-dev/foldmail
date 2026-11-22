@@ -132,7 +132,11 @@ fun wrapHtml(html: String?, plain: String): String {
     return "<!doctype html><html><head><meta charset=\"utf-8\">" +
         "<meta name=\"viewport\" content=\"width=device-width, minimum-scale=0.1, maximum-scale=5\">" +
         "<style>body{margin:12px;word-wrap:break-word;font-family:sans-serif;font-size:15px;color:#1d1d1f;background:#fff}" +
-        "img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>$inner</body></html>"
+        "html{-webkit-text-size-adjust:100%}img{max-width:100%;height:auto}table{max-width:100%}" +
+        // Newsletters: no animations, fixed backgrounds or effects that force a repaint on every scroll step.
+        "*{animation:none!important;transition:none!important;background-attachment:scroll!important;" +
+        "box-shadow:none!important;text-shadow:none!important;filter:none!important;backdrop-filter:none!important}" +
+        "</style></head><body>${inner.replace(Regex("<img\\b", RegexOption.IGNORE_CASE), "<img decoding=\"async\"")}</body></html>"
 }
 
 /** One entry of the "later" part of the More menu. */
