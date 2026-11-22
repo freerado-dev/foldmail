@@ -152,6 +152,9 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
                 settings.allowFileAccess = false
                 setBackgroundColor(android.graphics.Color.WHITE)
                 webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? =
+                        ImageShrinker.intercept(request)
+
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(request.url.toString())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                         return true
