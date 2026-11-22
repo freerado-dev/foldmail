@@ -99,9 +99,16 @@ fun ChatPane(
             }
             Column(Modifier.padding(start = 4.dp)) {
                 Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val lastMsg = conversation.last
                 Text(
-                    conversation.participants.joinToString(", "),
-                    style = MaterialTheme.typography.bodyMedium,
+                    com.foldmail.app.fromLine(lastMsg),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    com.foldmail.app.toLine(lastMsg),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )

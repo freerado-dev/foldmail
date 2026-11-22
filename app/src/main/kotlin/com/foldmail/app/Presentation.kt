@@ -156,3 +156,11 @@ fun snoozeOptions(now: Long, zone: ZoneId = ZoneId.systemDefault()): List<Snooze
         SnoozeOption("Budúci týždeň", "${day(monday)}, 9:00", monday.toInstant().toEpochMilli()),
     )
 }
+
+
+/** "Od" and "Komu" address lines of a message (addresses only, Cc included in the recipients). */
+fun fromLine(m: com.foldmail.domain.model.EmailMessage): String =
+    "Od: " + com.foldmail.domain.model.normalizeAddress(m.from)
+
+fun toLine(m: com.foldmail.domain.model.EmailMessage): String =
+    "Komu: " + (m.to + m.cc).map { com.foldmail.domain.model.normalizeAddress(it) }.distinct().joinToString(", ").ifBlank { "—" }
