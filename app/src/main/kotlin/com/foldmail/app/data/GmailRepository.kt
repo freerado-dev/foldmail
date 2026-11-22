@@ -340,7 +340,8 @@ class GmailRepository private constructor(private val context: Context) {
             val data = p.data ?: try {
                 java.util.Base64.getEncoder().encodeToString(GmailApi.attachment(token, gmailId, p.attachmentId ?: continue))
             } catch (_: Exception) { continue }
-            html = html.replace(Regex("cid:" + Regex.escape(p.cid), RegexOption.IGNORE_CASE), "data:${p.mime};base64,$data")
+            val (mime, small) = com.foldmail.app.ui.ImageShrinker.shrinkBase64(p.mime, data)
+            html = html.replace(Regex("cid:" + Regex.escape(p.cid), RegexOption.IGNORE_CASE), "data:$mime;base64,$small")
         }
         html
     }

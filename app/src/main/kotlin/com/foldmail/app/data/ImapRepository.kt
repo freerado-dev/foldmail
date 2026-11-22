@@ -509,7 +509,8 @@ class ImapRepository private constructor(private val context: Context) {
         var out = html
         for (p in inline) {
             val data = p.data ?: continue
-            out = out.replace(Regex("cid:" + Regex.escape(p.cid), RegexOption.IGNORE_CASE), "data:${p.mime};base64,$data")
+            val (mime, small) = com.foldmail.app.ui.ImageShrinker.shrinkBase64(p.mime, data)
+            out = out.replace(Regex("cid:" + Regex.escape(p.cid), RegexOption.IGNORE_CASE), "data:$mime;base64,$small")
         }
         out
     }

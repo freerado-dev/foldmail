@@ -54,6 +54,17 @@ object ImageShrinker {
         }
     }
 
+    /** Same scaling for images embedded in the mail itself (base64 data); returns (mime, base64). */
+    fun shrinkBase64(mime: String, base64: String): Pair<String, String> {
+        if (mime.contains("gif", true) || mime.contains("svg", true) || !mime.startsWith("image/", true)) return mime to base64
+        return try {
+            val e = shrink(java.util.Base64.getMimeDecoder().decode(base64), mime)
+            e.mime to java.util.Base64.getEncoder().encodeToString(e.bytes)
+        } catch (_: Throwable) {
+            mime to base64
+        }
+    }
+
     private fun shrink(bytes: ByteArray, mime: String): Entry {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
