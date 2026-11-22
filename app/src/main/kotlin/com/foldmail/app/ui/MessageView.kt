@@ -138,6 +138,9 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = false
+                // Images already downloaded are reused when scrolling back up instead of being fetched/decoded again.
+                settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+                setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
                 // Default (window) acceleration: a forced hardware layer makes tall pages re-render when scrolling back up.
                 isNestedScrollingEnabled = false
                 isVerticalScrollBarEnabled = true
