@@ -24,10 +24,25 @@ object AvatarImages {
 
     private fun md5(s: String) = MessageDigest.getInstance("MD5").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
-    private fun download(url: String): ByteArray? = try {
-        val c = (URL(url).openConnection() as HttpURLConnection).apply { connectTimeout = 6000; readTimeout = 8000; instanceFollowRedirects = true }
-        if (c.responseCode == 200) c.inputStream.use { it.readBytes() }.takeIf { it.size in 200..400_000 } else null
-    } catch (_: Exception) { null }
+    /** null = the server has nothing (404 etc.); throws on network trouble so that it is not remembered as "missing". */
+    private fun download(url: String): ByteArray? {
+        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 7000; readTimeout = 9000; instanceFollowRedirects = true
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+            setRequestProperty("Accept", "image/*,*/*;q=0.8")
+        }
+        return try {
+            if (c.responseCode == 200) c.inputStream.use { it.readBytes() }.takeIf { it.size in 100..600_000 } else null
+        } finally { c.disconnect() }
+    }
+
+    /** "mail.shop.example.co.uk" -> "example.co.uk" (rough, enough for logos). */
+    private fun rootDomain(d: String): String {
+        val p = d.split('.')
+        if (p.size <= 2) return d
+        val twoPart = setOf("co", "com", "org", "net", "gov", "ac")
+        return if (p[p.size - 2] in twoPart && p.last().length == 2) p.takeLast(3).joinToString(".") else p.takeLast(2).joinToString(".")
+    }
 
     suspend fun load(context: Context, address: String): Bitmap? {
         val addr = address.trim().lowercase()
@@ -35,19 +50,34 @@ object AvatarImages {
         memory.get(addr)?.let { return it }
         if (synchronized(missing) { addr in missing }) return null
         return withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "avatars").apply { mkdirs() }
+            val dir = File(context.cacheDir, "avatars2").apply { mkdirs() }
             val file = File(dir, md5(addr))
             val none = File(dir, md5(addr) + ".none")
             if (file.exists()) BitmapFactory.decodeFile(file.path)?.let { memory.put(addr, it); return@withContext it }
             if (none.exists() && System.currentTimeMillis() - none.lastModified() < RETRY_MS) { synchronized(missing) { missing.add(addr) }; return@withContext null }
             val domain = addr.substringAfter('@')
-            var bytes = download("https://www.gravatar.com/avatar/${md5(addr)}?s=96&d=404")
+            var networkTrouble = false
+            fun attempt(url: String): ByteArray? = try { download(url) } catch (_: Exception) { networkTrouble = true; null }
+            var bytes = attempt("https://www.gravatar.com/avatar/${md5(addr)}?s=96&d=404")
             if (bytes == null && domain !in freeMail) {
-                bytes = download("https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&url=http://$domain&size=128")
+                val root = rootDomain(domain)
+                val urls = buildList {
+                    add("https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://$domain&size=128")
+                    if (root != domain) add("https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://$root&size=128")
+                    add("https://$root/apple-touch-icon.png")
+                    add("https://www.$root/favicon.ico")
+                    add("https://$root/favicon.ico")
+                }
+                for (u in urls) {
+                    val got = attempt(u) ?: continue
+                    // keep only something that really decodes into a usable picture
+                    val o = BitmapFactory.decodeByteArray(got, 0, got.size)
+                    if (o != null && o.width >= 16) { bytes = got; break }
+                }
             }
             val bmp = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
             if (bmp != null) { file.writeBytes(bytes!!); memory.put(addr, bmp) }
-            else { none.writeText("1"); synchronized(missing) { missing.add(addr) } }
+            else if (!networkTrouble) { none.writeText("1"); synchronized(missing) { missing.add(addr) } }
             bmp
         }
     }
