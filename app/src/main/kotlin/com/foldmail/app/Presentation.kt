@@ -136,7 +136,7 @@ fun wrapHtml(html: String?, plain: String): String {
         // Newsletters: no animations, fixed backgrounds or effects that force a repaint on every scroll step.
         "*{animation:none!important;transition:none!important;background-attachment:scroll!important;" +
         "box-shadow:none!important;text-shadow:none!important;filter:none!important;backdrop-filter:none!important}" +
-        "</style></head><body>$inner</body></html>"
+        "</style></head><body>${inner.replace(Regex("<img\\b", RegexOption.IGNORE_CASE), "<img decoding=\"async\"")}</body></html>"
 }
 
 /** One entry of the "later" part of the More menu. */
