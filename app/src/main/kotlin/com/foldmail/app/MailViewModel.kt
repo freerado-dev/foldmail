@@ -195,8 +195,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun reportMessage(text: String) { message.value = text }
     fun consumeMessage() { message.value = null }
 
-    fun markRead(conversation: PersonConversation) =
-        repo.markRead(conversation.messages.filter { !it.isRead }.map { it.localId })
+    fun markRead(conversation: PersonConversation) {
+        val ids = conversation.messages.filter { !it.isRead }.map { it.localId }
+        repo.markRead(ids)
+        com.foldmail.app.data.Notifier.cancel(getApplication(), ids)
+    }
 
     fun selectAccount(id: Long?) { viewState.value = ViewState(id, ListView.All) }
     fun setView(v: ListView) { viewState.update { it.copy(view = v) } }
@@ -239,6 +242,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Moves to the trash (undoable); from inside the trash it deletes for real. */
     private fun trash(ids: List<Long>, text: String) {
         if (ids.isEmpty()) return
+        com.foldmail.app.data.Notifier.cancel(getApplication(), ids)
         if (viewState.value.view == ListView.Trash) {
             repo.moveMessages(ids, Folder.Trash)
             flags.update { it.copy(trashed = it.trashed - ids.toSet()) }
@@ -255,6 +259,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             Folder.Trash -> trash(ids, "Presunuté do koša")
             Folder.Archive -> {
                 val before = flags.value
+                com.foldmail.app.data.Notifier.cancel(getApplication(), ids)
                 repo.moveMessages(ids, Folder.Archive)
                 flags.update { it.copy(archived = it.archived + (key to clock()), snoozed = it.snoozed - key, trashed = it.trashed - ids.toSet()) }
                 offerUndo("Archivované") {

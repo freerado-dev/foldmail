@@ -93,6 +93,19 @@ object Notifier {
         }
     }
 
+    /** Removes the notifications of these messages (deleted, archived or read in the app) and the summary when none are left. */
+    fun cancel(context: Context, localIds: Collection<Long>) {
+        if (localIds.isEmpty()) return
+        val nm = NotificationManagerCompat.from(context)
+        localIds.forEach { nm.cancel(it.hashCode()) }
+        try {
+            val sys = context.getSystemService(NotificationManager::class.java)
+            val left = sys.activeNotifications.count { it.packageName == context.packageName && it.id != GROUP.hashCode() }
+            if (left == 0) nm.cancel(GROUP.hashCode())
+        } catch (_: Exception) {
+        }
+    }
+
     /** Plays a sound once (preview in the settings). */
     fun preview(context: Context, s: NotificationSound) {
         try {
