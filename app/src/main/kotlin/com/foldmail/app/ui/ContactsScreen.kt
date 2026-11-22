@@ -52,7 +52,7 @@ fun ContactsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Avatar(name, size = 30.dp)
+                    Avatar(name, size = 30.dp, address = address)
                     Column {
                         Text(name, fontWeight = FontWeight.SemiBold)
                         Text(address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

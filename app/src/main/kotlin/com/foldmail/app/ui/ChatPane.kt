@@ -197,7 +197,7 @@ private fun MessageRow(
         verticalAlignment = Alignment.Top,
     ) {
         if (!outgoing) {
-            Avatar(senderName, size = 24.dp)
+            Avatar(senderName, size = 24.dp, address = normalizeAddress(m.from))
             Spacer(Modifier.width(6.dp))
         }
         // One box per email: subject and time, a 4-line preview, a strip of attachment thumbnails. Tap = full email.

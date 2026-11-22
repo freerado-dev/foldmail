@@ -39,6 +39,9 @@ class AppSettings private constructor(context: Context) {
     fun setRemoteImages(v: Boolean) { prefs.edit().putBoolean("remoteImages", v).apply(); remoteImages.value = v }
     fun setSyncMinutes(v: Int) { prefs.edit().putInt("syncMinutes", v).apply(); syncMinutes.value = v }
 
+    val senderPhotos = MutableStateFlow(prefs.getBoolean("senderPhotos", true))
+    fun setSenderPhotos(v: Boolean) { prefs.edit().putBoolean("senderPhotos", v).apply(); senderPhotos.value = v }
+
     fun setDark(v: Boolean) { prefs.edit().putBoolean("dark", v).apply(); dark.value = v }
     fun setNotifications(v: Boolean) { prefs.edit().putBoolean("notifications", v).apply(); notifications.value = v }
     fun setSound(key: String) { prefs.edit().putString("sound", key).apply(); sound.value = key }

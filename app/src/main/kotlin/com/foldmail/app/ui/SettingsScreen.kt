@@ -53,6 +53,7 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier, accounts: 
     val sound by settings.sound.collectAsState()
     val preview by settings.notificationPreview.collectAsState()
     val remoteImages by settings.remoteImages.collectAsState()
+    val senderPhotos by settings.senderPhotos.collectAsState()
     val syncMinutes by settings.syncMinutes.collectAsState()
     var sigAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1L) }
     val sigId = accounts.firstOrNull { it.id == sigAccount }?.id ?: accounts.firstOrNull()?.id ?: -1L
@@ -124,6 +125,7 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier, accounts: 
 
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             Header("Čítanie emailov")
+            SwitchRow("Fotky a ikony odosielateľov", "Profilová fotka (Gravatar) alebo ikona webu firmy namiesto písmena. Na vyhľadanie sa posiela adresa odosielateľa.", senderPhotos) { settings.setSenderPhotos(it) }
             SwitchRow("Načítavať obrázky z internetu", "Vypnutím sa skryjú aj sledovacie pixely; obrázky v prílohách ostanú.", remoteImages) { settings.setRemoteImages(it) }
 
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)

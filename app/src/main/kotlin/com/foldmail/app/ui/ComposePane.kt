@@ -98,7 +98,7 @@ private fun RecipientField(
                     }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(name, size = 32.dp)
+                    Avatar(name, size = 32.dp, address = address)
                     Column(Modifier.padding(start = 12.dp)) {
                         Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

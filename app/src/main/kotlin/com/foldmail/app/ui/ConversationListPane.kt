@@ -270,7 +270,7 @@ internal fun ConversationRow(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Avatar(title, size = 36.dp, isGroup = c.isGroup)
+            Avatar(title, size = 36.dp, isGroup = c.isGroup, address = c.participants.singleOrNull())
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(width = 4.dp, height = 13.dp).clip(RoundedCornerShape(2.dp)).background(Color(ui.accountColor(last.accountId))))
