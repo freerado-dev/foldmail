@@ -162,16 +162,28 @@ fun SwipeRevealRow(
 /** Opens the drawer on a right swipe anywhere a child did not already consume the drag. */
 fun Modifier.openOnRightSwipe(thresholdDp: Float = 70f, onOpen: () -> Unit): Modifier = this.pointerInput(Unit) {
     val threshold = thresholdDp * density
+    val slop = viewConfiguration.touchSlop
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        var total = 0f
-        val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-            if (over > 0f) { change.consume(); total += over }
+        var dx = 0f
+        var dy = 0f
+        var claimed = false
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) break
+            if (change.isConsumed && !claimed) break
+            val d = change.positionChange()
+            dx += d.x
+            dy += d.y
+            if (!claimed) {
+                // Mostly vertical movement (scrolling a list or an email) is never ours: leave it alone.
+                if (kotlin.math.abs(dy) > slop && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 0.6f) break
+                if (dx > slop * 2 && dx > kotlin.math.abs(dy) * 3f) claimed = true
+            }
+            if (claimed) change.consume()
         }
-        if (drag != null) {
-            horizontalDrag(drag.id) { change -> total += change.positionChange().x; change.consume() }
-            if (total > threshold) onOpen()
-        }
+        if (claimed && dx > threshold) onOpen()
     }
 }
 
