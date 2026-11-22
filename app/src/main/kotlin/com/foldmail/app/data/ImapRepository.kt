@@ -577,11 +577,24 @@ class ImapRepository private constructor(private val context: Context) {
                 if (bcc.isNotEmpty()) msg.setRecipients(Message.RecipientType.BCC, InternetAddress.parse(bcc.joinToString(","), false))
                 msg.setSubject(subject, "UTF-8")
                 if (!inReplyTo.isNullOrBlank()) { msg.setHeader("In-Reply-To", inReplyTo); msg.setHeader("References", inReplyTo) }
+                val sig = Signature.htmlFor(body)
+                fun altMultipart(s: Signature.Html): MimeMultipart {
+                    val alt = MimeMultipart("alternative")
+                    alt.addBodyPart(MimeBodyPart().apply { setText(body, "UTF-8") })
+                    val rel = MimeMultipart("related")
+                    rel.addBodyPart(MimeBodyPart().apply { setContent(s.html, "text/html; charset=UTF-8") })
+                    rel.addBodyPart(MimeBodyPart().apply {
+                        dataHandler = DataHandler(ByteArrayDataSource(s.photo, "image/jpeg"))
+                        setHeader("Content-ID", "<sigphoto>"); disposition = "inline"; fileName = "podpis.jpg"
+                    })
+                    alt.addBodyPart(MimeBodyPart().apply { setContent(rel) })
+                    return alt
+                }
                 if (attachments.none { it.uri != null }) {
-                    msg.setText(body, "UTF-8")
+                    if (sig == null) msg.setText(body, "UTF-8") else msg.setContent(altMultipart(sig))
                 } else {
                     val mp = MimeMultipart("mixed")
-                    mp.addBodyPart(MimeBodyPart().apply { setText(body, "UTF-8") })
+                    mp.addBodyPart(MimeBodyPart().apply { if (sig == null) setText(body, "UTF-8") else setContent(altMultipart(sig)) })
                     for (a in attachments) {
                         val uri = a.uri ?: continue
                         val bytes = context.contentResolver.openInputStream(android.net.Uri.parse(uri))?.use { it.readBytes() } ?: continue

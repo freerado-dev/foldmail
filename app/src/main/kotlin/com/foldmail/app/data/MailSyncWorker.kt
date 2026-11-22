@@ -23,13 +23,13 @@ class MailSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
     companion object {
         private const val NAME = "mail-sync"
 
-        fun schedule(context: Context, enabled: Boolean) {
+        fun schedule(context: Context, enabled: Boolean, minutes: Int = AppSettings.get(context).syncMinutes.value) {
             val wm = WorkManager.getInstance(context)
             if (!enabled) { wm.cancelUniqueWork(NAME); return }
-            val req = PeriodicWorkRequestBuilder<MailSyncWorker>(15, TimeUnit.MINUTES)
+            val req = PeriodicWorkRequestBuilder<MailSyncWorker>(minutes.coerceAtLeast(15).toLong(), TimeUnit.MINUTES)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
-            wm.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, req)
+            wm.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE, req)
         }
     }
 }

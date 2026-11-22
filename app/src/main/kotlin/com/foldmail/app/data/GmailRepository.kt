@@ -236,9 +236,11 @@ class GmailRepository private constructor(private val context: Context) {
                     val bytes = context.contentResolver.openInputStream(android.net.Uri.parse(uri))?.use { it.readBytes() } ?: return@mapNotNull null
                     MimeBuilder.Part(a.name, a.mimeType, bytes)
                 }
+                val sig = Signature.htmlFor(body)
                 val raw = MimeBuilder.build(
                     from = account.email, to = to, cc = cc, bcc = bcc, subject = subject, body = body,
                     inReplyTo = inReplyTo, references = listOfNotNull(inReplyTo), parts = parts,
+                    sigHtml = sig?.html, sigPhoto = sig?.photo,
                 )
                 GmailApi.send(token, raw, inReplyTo?.let { threadByMessageId[it] })
                 sync()

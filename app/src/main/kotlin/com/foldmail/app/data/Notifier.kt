@@ -71,8 +71,8 @@ object Notifier {
                 val n = NotificationCompat.Builder(context, channel)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(m.sender)
-                    .setContentText(m.subject)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(m.subject + "\n" + m.preview))
+                    .setContentText(if (settings.notificationPreview.value) m.subject else "Nový email")
+                    .apply { if (settings.notificationPreview.value) setStyle(NotificationCompat.BigTextStyle().bigText(m.subject + "\n" + m.preview)) }
                     .setContentIntent(tap).setAutoCancel(true).setGroup(GROUP)
                     .setCategory(NotificationCompat.CATEGORY_EMAIL)
                     // only the first one rings, the rest are silent

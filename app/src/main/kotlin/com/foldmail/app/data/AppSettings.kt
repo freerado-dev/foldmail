@@ -31,6 +31,20 @@ class AppSettings private constructor(context: Context) {
     val notifications = MutableStateFlow(prefs.getBoolean("notifications", true))
     val sound = MutableStateFlow(prefs.getString("sound", null) ?: NotificationSounds.first().key)
 
+    val signatureEnabled = MutableStateFlow(prefs.getBoolean("sigEnabled", false))
+    val signatureText = MutableStateFlow(prefs.getString("sigText", "") ?: "")
+    val signatureOnReplies = MutableStateFlow(prefs.getBoolean("sigReplies", true))
+    val notificationPreview = MutableStateFlow(prefs.getBoolean("notifPreview", true))
+    val remoteImages = MutableStateFlow(prefs.getBoolean("remoteImages", true))
+    val syncMinutes = MutableStateFlow(prefs.getInt("syncMinutes", 15))
+
+    fun setSignatureEnabled(v: Boolean) { prefs.edit().putBoolean("sigEnabled", v).apply(); signatureEnabled.value = v }
+    fun setSignatureText(v: String) { prefs.edit().putString("sigText", v).apply(); signatureText.value = v }
+    fun setSignatureOnReplies(v: Boolean) { prefs.edit().putBoolean("sigReplies", v).apply(); signatureOnReplies.value = v }
+    fun setNotificationPreview(v: Boolean) { prefs.edit().putBoolean("notifPreview", v).apply(); notificationPreview.value = v }
+    fun setRemoteImages(v: Boolean) { prefs.edit().putBoolean("remoteImages", v).apply(); remoteImages.value = v }
+    fun setSyncMinutes(v: Int) { prefs.edit().putInt("syncMinutes", v).apply(); syncMinutes.value = v }
+
     fun setDark(v: Boolean) { prefs.edit().putBoolean("dark", v).apply(); dark.value = v }
     fun setNotifications(v: Boolean) { prefs.edit().putBoolean("notifications", v).apply(); notifications.value = v }
     fun setSound(key: String) { prefs.edit().putString("sound", key).apply(); sound.value = key }

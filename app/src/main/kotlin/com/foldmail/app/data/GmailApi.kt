@@ -279,6 +279,8 @@ object MimeBuilder {
         inReplyTo: String?,
         references: List<String>,
         parts: List<Part>,
+        sigHtml: String? = null,
+        sigPhoto: ByteArray? = null,
         boundary: String = "foldmail-" + java.util.UUID.randomUUID().toString().replace("-", ""),
     ): String {
         val mime = Base64.getMimeEncoder(76, "\r\n".toByteArray())
@@ -295,11 +297,28 @@ object MimeBuilder {
             .append("Content-Type: text/plain; charset=UTF-8\r\n")
             .append("Content-Transfer-Encoding: base64\r\n\r\n")
             .append(mime.encodeToString(body.toByteArray(Charsets.UTF_8))).append("\r\n")
+        val bodyBlock: CharSequence = if (sigHtml == null || sigPhoto == null) textPart else {
+            val alt = "$boundary-alt"; val rel = "$boundary-rel"
+            StringBuilder()
+                .append("Content-Type: multipart/alternative; boundary=\"").append(alt).append("\"\r\n\r\n")
+                .append("--").append(alt).append("\r\n").append(textPart)
+                .append("--").append(alt).append("\r\n")
+                .append("Content-Type: multipart/related; boundary=\"").append(rel).append("\"\r\n\r\n")
+                .append("--").append(rel).append("\r\n")
+                .append("Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n")
+                .append(mime.encodeToString(sigHtml.toByteArray(Charsets.UTF_8))).append("\r\n")
+                .append("--").append(rel).append("\r\n")
+                .append("Content-Type: image/jpeg; name=\"podpis.jpg\"\r\nContent-ID: <sigphoto>\r\n")
+                .append("Content-Disposition: inline; filename=\"podpis.jpg\"\r\nContent-Transfer-Encoding: base64\r\n\r\n")
+                .append(mime.encodeToString(sigPhoto)).append("\r\n")
+                .append("--").append(rel).append("--\r\n")
+                .append("--").append(alt).append("--\r\n")
+        }
         if (parts.isEmpty()) {
-            sb.append(textPart)
+            sb.append(bodyBlock)
         } else {
             sb.append("Content-Type: multipart/mixed; boundary=\"").append(boundary).append("\"\r\n\r\n")
-            sb.append("--").append(boundary).append("\r\n").append(textPart)
+            sb.append("--").append(boundary).append("\r\n").append(bodyBlock)
             for (p in parts) {
                 val n = encodeWord(p.name)
                 sb.append("--").append(boundary).append("\r\n")

@@ -161,8 +161,12 @@ fun HtmlView(html: String?, plain: String, modifier: Modifier = Modifier, inline
                 }
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) { onBottom?.invoke(view.contentHeight * view.scale <= view.height + view.scrollY + 24f) }
-                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? =
-                        ImageShrinker.intercept(request)
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                        if (!com.foldmail.app.data.AppSettings.get(ctx).remoteImages.value && request.url.scheme.let { it == "http" || it == "https" }) {
+                            return android.webkit.WebResourceResponse("text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0)))
+                        }
+                        return ImageShrinker.intercept(request)
+                    }
 
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(request.url.toString())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
