@@ -110,6 +110,18 @@ fun ConversationListPane(
                 }
             }
     }
+    // Compose keeps the list anchored to the item that was on top, so mail arriving above it stays hidden.
+    // While the user is at the very top we follow the newest mail instead.
+    var stickToTop by remember { androidx.compose.runtime.mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(listState) {
+        androidx.compose.runtime.snapshotFlow { listState.isScrollInProgress }.collect { moving ->
+            if (!moving) stickToTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    val newest = visible.firstOrNull()
+    androidx.compose.runtime.LaunchedEffect(newest?.key, newest?.last?.localId) {
+        if (stickToTop) listState.scrollToItem(0)
+    }
     val pinned = if (view == ListView.Archived || view == ListView.Trash) emptyList() else visible.filter { it.key in ui.pinned }
     val sections = remember(visible, pinned) { visible.filter { it !in pinned }.groupBy { sectionOf(it.last.sentAtMillis) } }
 
