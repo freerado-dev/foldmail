@@ -35,8 +35,13 @@ jobs:
           done
           gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/latest" || true
           gh release create latest FoldMail-debug.apk --title "FoldMail debug APK" --notes "Automatický build z commitu ${GITHUB_SHA::7}" --target "$GITHUB_SHA" --latest --draft=false
-          # Make sure it is published and not left as a draft (look it up by id, drafts have no tag page).
-          rid=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[] | select(.tag_name=="latest") | .id' | head -1)
-          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$rid" -F draft=false --jq '{id,draft,tag_name}'
-          sleep 3
+          # Make sure it is published and not left as a draft: repeat until the download link really answers.
+          for attempt in 1 2 3 4 5 6; do
+            rid=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[] | select(.tag_name=="latest") | .id' | head -1)
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$rid" -F draft=false --jq '{id,draft,tag_name}'
+            sleep 8
+            code=$(curl -s -o /dev/null -L -w "%{http_code}" "https://github.com/${GITHUB_REPOSITORY}/releases/download/latest/FoldMail-debug.apk" || true)
+            echo "attempt $attempt: download link answers $code"
+            [ "$code" = "200" ] && break
+          done
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[] | {id,draft,tag_name,created_at}'
