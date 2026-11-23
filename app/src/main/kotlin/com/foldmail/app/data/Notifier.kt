@@ -18,6 +18,8 @@ import com.foldmail.app.R
 class NewMail(val localId: Long, val sender: String, val subject: String, val preview: String)
 
 object Notifier {
+    const val EXTRA_FROM_NOTIFICATION = "fm_from_notification"
+
     private const val PREFIX = "mail_"
     private const val GROUP = "foldmail_new_mail"
 
@@ -63,7 +65,7 @@ object Notifier {
         val settings = AppSettings.get(context)
         if (!settings.notifications.value || !hasPermission(context)) return
         val channel = ensureChannel(context, soundByKey(settings.sound.value))
-        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.putExtra(EXTRA_FROM_NOTIFICATION, true)
         val tap = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val nm = NotificationManagerCompat.from(context)
         try {

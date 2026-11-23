@@ -181,11 +181,20 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
     LaunchedEffect(ui.message) {
         ui.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); vm.consumeMessage() }
     }
+    val goHomeTick by com.foldmail.app.NavSignal.goHome.collectAsStateWithLifecycle()
     fun showList() { tab = MainTab.Chats; openKey = null; composing = false; viewingId = null; showSettings = false; showDrafts = false; scope.launch { drawerState.close() } }
 
     fun startCompose(to: String = "") {
         composeTo = to; composeSubject = ""; composeBody = ""; composeCc = ""; composeReplyTo = null; composeAccount = -1L; composeFiles = emptyList(); composeBcc = ""; composeDraftId = null
         draftVersion++; composing = true; showSettings = false; showDrafts = false; tab = MainTab.Chats
+    }
+    androidx.compose.runtime.LaunchedEffect(goHomeTick) {
+        if (goHomeTick != com.foldmail.app.NavSignal.handled) {
+            com.foldmail.app.NavSignal.handled = goHomeTick
+            // From a notification: back to the list of all mails (an unfinished new email stays open).
+            tab = MainTab.Chats; openKey = null; viewingId = null; showSettings = false; showDrafts = false
+            search.open = false; gallery = null
+        }
     }
     fun openChat(key: String) { openKey = key; composing = false; showSettings = false; showDrafts = false; viewingId = null; tab = MainTab.Chats }
     fun onMessageAction(a: MessageAction, m: EmailMessage) {

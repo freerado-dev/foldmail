@@ -14,7 +14,19 @@ import com.foldmail.app.data.MailSyncWorker
 import com.foldmail.app.ui.FoldMailApp
 import com.foldmail.designsystem.FoldMailTheme
 
+/** Tapping a new-mail notification asks the app to show the list of all mails, wherever the user left off. */
+object NavSignal {
+    val goHome = kotlinx.coroutines.flow.MutableStateFlow(0)
+    @Volatile var handled = 0
+}
+
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(com.foldmail.app.data.Notifier.EXTRA_FROM_NOTIFICATION, false)) NavSignal.goHome.value++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val settings = AppSettings.get(this)
