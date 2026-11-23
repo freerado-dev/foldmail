@@ -65,7 +65,11 @@ object Notifier {
         val settings = AppSettings.get(context)
         if (!settings.notifications.value || !hasPermission(context)) return
         val channel = ensureChannel(context, soundByKey(settings.sound.value))
-        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.putExtra(EXTRA_FROM_NOTIFICATION, true)
+        // Explicit intent to the running activity (singleTop + clear top) so that onNewIntent is delivered even when the app sits in the background.
+        val open = android.content.Intent(context, com.foldmail.app.MainActivity::class.java)
+            .setAction(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra(EXTRA_FROM_NOTIFICATION, true)
         val tap = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val nm = NotificationManagerCompat.from(context)
         try {

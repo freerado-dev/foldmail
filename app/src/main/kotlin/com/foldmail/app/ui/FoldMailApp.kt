@@ -194,7 +194,8 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
             // From a notification: back to the list of all mails (an unfinished new email stays open).
             tab = MainTab.Chats; openKey = null; viewingId = null; showSettings = false; showDrafts = false
             search.open = false; gallery = null
-            runCatching { chatsListState.scrollToItem(0) }
+            kotlinx.coroutines.delay(120)
+            runCatching { chatsListState.scrollToItem(0); groupsListState.scrollToItem(0) }
         }
     }
     fun openChat(key: String) { openKey = key; composing = false; showSettings = false; showDrafts = false; viewingId = null; tab = MainTab.Chats }
