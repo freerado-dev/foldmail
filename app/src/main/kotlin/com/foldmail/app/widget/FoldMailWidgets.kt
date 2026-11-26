@@ -102,7 +102,7 @@ object Widgets {
 }
 
 @Composable
-private fun Frame(context: Context, padding: Int = 12, content: @Composable () -> Unit) {
+private fun Frame(context: Context, padding: Int = 12, content: @Composable androidx.glance.layout.ColumnScope.() -> Unit) {
     Column(
         GlanceModifier.fillMaxSize().background(bg).cornerRadius(28.dp).padding(padding.dp)
             .clickable(actionStartActivity(openIntent(context, null))),
