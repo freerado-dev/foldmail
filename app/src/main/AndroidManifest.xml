@@ -29,19 +29,19 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".widget.SmallWidgetReceiver" android:exported="true" android:label="FoldMail Small">
+        <receiver android:name=".widget.SmallWidgetReceiver" android:exported="true" android:label="FoldMail – malý">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_small" />
         </receiver>
-        <receiver android:name=".widget.StripWidgetReceiver" android:exported="true" android:label="FoldMail Strip">
+        <receiver android:name=".widget.StripWidgetReceiver" android:exported="true" android:label="FoldMail – úzky">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_strip" />
         </receiver>
-        <receiver android:name=".widget.MediumWidgetReceiver" android:exported="true" android:label="FoldMail Medium">
+        <receiver android:name=".widget.MediumWidgetReceiver" android:exported="true" android:label="FoldMail – stredný">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_medium" />
         </receiver>
-        <receiver android:name=".widget.LargeWidgetReceiver" android:exported="true" android:label="FoldMail Large">
+        <receiver android:name=".widget.LargeWidgetReceiver" android:exported="true" android:label="FoldMail – veľký">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_large" />
         </receiver>

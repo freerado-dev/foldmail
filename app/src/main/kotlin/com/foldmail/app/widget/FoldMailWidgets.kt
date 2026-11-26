@@ -67,16 +67,19 @@ private fun openIntent(context: Context, key: String?, compose: Boolean = false)
 abstract class BaseWidget(private val kind: Kind) : GlanceAppWidget() {
     enum class Kind { Small, Strip, Medium, Large }
 
-    override val sizeMode: SizeMode = SizeMode.Single
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val data = WidgetData.read(context)
-            when (kind) {
-                Kind.Small -> SmallLayout(context, data)
-                Kind.Strip -> StripLayout(context, data)
-                Kind.Medium -> ListLayout(context, data, rows = 3)
-                Kind.Large -> ListLayout(context, data, rows = 7)
+            // The layout follows the real size, so any widget stretched big becomes a list and a thin one becomes a strip.
+            val size = androidx.glance.LocalSize.current
+            val h = size.height.value
+            val w = size.width.value
+            when {
+                h < 90f && w >= 180f -> StripLayout(context, data)
+                w < 190f || h < 120f -> SmallLayout(context, data)
+                else -> ListLayout(context, data, rows = ((h - 62f) / 54f).toInt().coerceIn(1, 8))
             }
         }
     }
