@@ -101,16 +101,6 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     .apply()
             }
         }
-        // Keep the home-screen widgets in step with the inbox.
-        viewModelScope.launch {
-            state.collect { st ->
-                if (st.view != ListView.All || st.selectedAccount != null || st.conversations.isEmpty()) return@collect
-                val snap = com.foldmail.app.data.WidgetData.build(
-                    st.conversations, st.bodies, st.names, st.selfAddress, st.totalUnread,
-                )
-                if (com.foldmail.app.data.WidgetData.save(getApplication(), snap)) com.foldmail.app.widget.Widgets.updateAll(getApplication())
-            }
-        }
         // Pull new mail once a minute while the app is alive (no-op without a real account).
         viewModelScope.launch {
             while (true) {
@@ -165,6 +155,20 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         )
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MailUiState())
+
+    // After `state` exists (an init block placed above it would run too early and crash).
+    init {
+        // Keep the home-screen widgets in step with the inbox.
+        viewModelScope.launch {
+            state.collect { st ->
+                if (st.view != ListView.All || st.selectedAccount != null || st.conversations.isEmpty()) return@collect
+                val snap = com.foldmail.app.data.WidgetData.build(
+                    st.conversations, st.bodies, st.names, st.selfAddress, st.totalUnread,
+                )
+                if (com.foldmail.app.data.WidgetData.save(getApplication(), snap)) com.foldmail.app.widget.Widgets.updateAll(getApplication())
+            }
+        }
+    }
 
     /** [accountId] null = the account currently selected in the drawer, else the first one. */
     fun send(
