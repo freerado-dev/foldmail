@@ -18,17 +18,27 @@ import com.foldmail.designsystem.FoldMailTheme
 object NavSignal {
     val goHome = kotlinx.coroutines.flow.MutableStateFlow(0)
     @Volatile var handled = 0
+    /** "compose" or "chat:<key>" requested by a widget. */
+    val pending = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun route(intent: android.content.Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra("fm_compose", false)) pending.value = "compose"
+        else intent.getStringExtra("fm_open")?.let { pending.value = "chat:$it" }
+    }
 }
 
 class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        NavSignal.route(intent)
         if (intent.getBooleanExtra(com.foldmail.app.data.Notifier.EXTRA_FROM_NOTIFICATION, false)) NavSignal.goHome.value++
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) NavSignal.route(intent)
         val settings = AppSettings.get(this)
         MailSyncWorker.schedule(this, settings.notifications.value)
         // Android 13+ shows no notifications until the user allows them; ask once at start.

@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">FoldMail</string>
+    <string name="widget_small_desc">Malý: počet neprečítaných a nový email</string>
+    <string name="widget_strip_desc">Úzky: posledná správa a počet neprečítaných</string>
+    <string name="widget_medium_desc">Stredný: tri najnovšie chaty</string>
+    <string name="widget_large_desc">Veľký: sedem najnovších chatov</string>
 </resources>

@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.play.services.auth)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.android.mail)
     implementation(libs.android.activation)
 

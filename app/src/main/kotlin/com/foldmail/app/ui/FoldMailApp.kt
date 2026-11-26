@@ -199,6 +199,12 @@ fun FoldMailApp(vm: MailViewModel = viewModel()) {
         }
     }
     fun openChat(key: String) { openKey = key; composing = false; showSettings = false; showDrafts = false; viewingId = null; tab = MainTab.Chats }
+    val widgetRequest by com.foldmail.app.NavSignal.pending.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(widgetRequest) {
+        val p = widgetRequest ?: return@LaunchedEffect
+        com.foldmail.app.NavSignal.pending.value = null
+        if (p == "compose") startCompose() else if (p.startsWith("chat:")) openChat(p.removePrefix("chat:"))
+    }
     fun onMessageAction(a: MessageAction, m: EmailMessage) {
         val body = ui.bodies[m.localId].orEmpty()
         when (a) {

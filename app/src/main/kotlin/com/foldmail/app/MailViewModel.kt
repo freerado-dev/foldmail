@@ -101,6 +101,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     .apply()
             }
         }
+        // Keep the home-screen widgets in step with the inbox.
+        viewModelScope.launch {
+            state.collect { st ->
+                if (st.view != ListView.Inbox || st.selectedAccount != null || st.conversations.isEmpty()) return@collect
+                val snap = com.foldmail.app.data.WidgetData.build(
+                    st.conversations.filter { !it.isGroup || true }, st.bodies, st.names, st.selfAddress, st.totalUnread,
+                )
+                if (com.foldmail.app.data.WidgetData.save(getApplication(), snap)) com.foldmail.app.widget.Widgets.updateAll(getApplication())
+            }
+        }
         // Pull new mail once a minute while the app is alive (no-op without a real account).
         viewModelScope.launch {
             while (true) {

@@ -49,6 +49,13 @@ object AvatarImages {
 
     private fun customFile(context: Context, addr: String) = File(context.filesDir, "photo_" + md5(addr.trim().lowercase()) + ".jpg")
 
+    /** Picture file already on the device for this address (own photo or a downloaded one), for the home-screen widgets. */
+    fun localFile(context: Context, address: String): File? {
+        val addr = address.trim().lowercase()
+        customFile(context, addr).takeIf { it.exists() }?.let { return it }
+        return File(File(context.cacheDir, "avatars2"), md5(addr)).takeIf { it.exists() }
+    }
+
     fun hasCustom(context: Context, addr: String) = customFile(context, addr).exists()
 
     /** Own picture for an account address: square crop, 192 px. */

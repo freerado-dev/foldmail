@@ -29,6 +29,23 @@
             </intent-filter>
         </activity>
 
+        <receiver android:name=".widget.SmallWidgetReceiver" android:exported="true" android:label="FoldMail Small">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_small" />
+        </receiver>
+        <receiver android:name=".widget.StripWidgetReceiver" android:exported="true" android:label="FoldMail Strip">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_strip" />
+        </receiver>
+        <receiver android:name=".widget.MediumWidgetReceiver" android:exported="true" android:label="FoldMail Medium">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_medium" />
+        </receiver>
+        <receiver android:name=".widget.LargeWidgetReceiver" android:exported="true" android:label="FoldMail Large">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_large" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

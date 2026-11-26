@@ -17,6 +17,7 @@ class MailSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val imap = ImapRepository.get(applicationContext)
         if (gmail.accounts.value.isNotEmpty()) try { gmail.syncNow() } catch (_: Exception) { /* next run tries again */ }
         if (imap.accounts.value.isNotEmpty()) try { imap.syncNow() } catch (_: Exception) { }
+        try { if (WidgetData.refreshFromRepos(applicationContext)) com.foldmail.app.widget.Widgets.updateAll(applicationContext) } catch (_: Exception) { }
         return Result.success()
     }
 
