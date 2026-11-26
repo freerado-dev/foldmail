@@ -8,6 +8,6 @@
     android:minResizeHeight="250dp"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/glance_default_loader"
+    android:initialLayout="@layout/widget_loading"
     android:description="@string/widget_large_desc"
     android:widgetCategory="home_screen" />
